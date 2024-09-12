@@ -1,0 +1,34 @@
+{
+   "action": {
+      "default_icon": {
+         "16": "images/icon.png",
+         "24": "images/icon.png",
+         "32": "images/icon.png"
+      },
+      "default_title": "Archive Page"
+   },
+   "author": "Justin Q Pham",
+   "background": {
+      "service_worker": "service_worker.js"
+   },
+   "content_security_policy": {
+   },
+   "description": "Archive webpage with archive.today",
+   "icons": {
+      "128": "images/icon.png",
+      "16": "images/icon.png",
+      "24": "images/icon.png",
+      "32": "images/icon.png",
+      "48": "images/icon.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjPhXRfaBXO1VU0UaYGKGNvjIx7FdjZUKGxfWEZKFCGvnp4Uq21ULdJozVbePpVXp03uLnBHiE2OyMYXBMDR56f4yeFv88v8yEpCqdNbyZo5V+/kSR5g5/Fgkyx+S2arZ5fy6MXjV67GwBMk6DxWsfm44VcbGseLSqXJ0Ldl66FvnIXfs1vcuDdHLvZgwMSytBwxygdoEIijohr+IMVzYcl0D+c6QuJ5620awCu6GgD2Nboa2RG+tN0dSviJHdhhJEm+QLhjB88REsH3GB39Ytak3AFbiSL2ry2aEi0G7Zs6lZ/NbXf6ziZTbtlZoT4HHtMzfLlJYwiYOT/1FZT5ZswIDAQAB",
+   "manifest_version": 3,
+   "name": "Archive Page",
+   "options_ui": {
+      "open_in_tab": false,
+      "page": "options.html"
+   },
+   "permissions": [ "contextMenus", "storage", "tabs" ],
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "0.7.0"
+}
