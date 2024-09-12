@@ -1,4 +1,4 @@
-// Archive Page extension for Google Chrome for use with archive.today
+// Paywall Remover extension for Google Chrome for use with archive.today
 // Written by Justin Q Pham
 // 1. Toolbar icon to send current tab to archive.today in new tab
 // 2. Page context menu to search archive.today for the page URL
@@ -10,7 +10,7 @@
 const URLA = 'https://archive.today/?run=1&url=';   // URL to invoke archive.today
 const URLS = 'https://archive.today/search/?q='     // URL to search archive.today
 
-// Archive page URL
+// Paywall Remover URL
 function doArchivePage(uri, act) {
     console.log('doArchivePage act: ' + act); // DEBUG
     chrome.storage.sync.get({ tabOption: 0 }, function(result) {

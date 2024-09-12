@@ -5,7 +5,7 @@
          "24": "images/icon.png",
          "32": "images/icon.png"
       },
-      "default_title": "Archive Page"
+      "default_title": "Paywall Remover"
    },
    "author": "Justin Q Pham",
    "background": {
@@ -23,7 +23,7 @@
    },
    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjPhXRfaBXO1VU0UaYGKGNvjIx7FdjZUKGxfWEZKFCGvnp4Uq21ULdJozVbePpVXp03uLnBHiE2OyMYXBMDR56f4yeFv88v8yEpCqdNbyZo5V+/kSR5g5/Fgkyx+S2arZ5fy6MXjV67GwBMk6DxWsfm44VcbGseLSqXJ0Ldl66FvnIXfs1vcuDdHLvZgwMSytBwxygdoEIijohr+IMVzYcl0D+c6QuJ5620awCu6GgD2Nboa2RG+tN0dSviJHdhhJEm+QLhjB88REsH3GB39Ytak3AFbiSL2ry2aEi0G7Zs6lZ/NbXf6ziZTbtlZoT4HHtMzfLlJYwiYOT/1FZT5ZswIDAQAB",
    "manifest_version": 3,
-   "name": "Archive Page",
+   "name": "Paywall Remover",
    "options_ui": {
       "open_in_tab": false,
       "page": "options.html"
