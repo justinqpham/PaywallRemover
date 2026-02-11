@@ -13,8 +13,6 @@ This document is the technical handoff for integrating this extension's archive 
   - `paywall_prompt.js`
   - `options.html`
   - `options.js`
-  - `wayback_picker.html`
-  - `wayback_picker.js`
 - Shared core modules:
   - `src/archive_client.js`
   - `src/access_resolver.js`
@@ -27,8 +25,7 @@ This document is the technical handoff for integrating this extension's archive 
   - Toolbar click (`chrome.action.onClicked`)
   - Context menus (`chrome.contextMenus.onClicked`)
   - Content-script prompt (`chrome.runtime.sendMessage` from `paywall_prompt.js`)
-- Action context menu includes a Wayback snapshot picker entry (`contexts: ['action']`).
-- Wayback picker attempts `chrome.action.openPopup()` first (icon-anchored) and falls back to a positioned popup window.
+- Action context menu includes a Wayback snapshot picker entry (`contexts: ['action']`) rendered as an in-page popup via content-script message.
 - Action context menu includes `Open settings`, which opens `options.html` in a new tab.
 - Event handlers load persisted settings from `chrome.storage.sync`.
 - URL targets are converted into archive URLs through shared core modules.
@@ -121,8 +118,9 @@ Menu IDs currently:
 
 Runtime message types:
 
-- `wayback_picker_ready`
 - `open_from_paywall_prompt`
+- `fetch_wayback_snapshots`
+- `show_wayback_overlay` (tab message from service worker to content script)
 
 If another extension depends on menu IDs, keep these constants stable.
 
@@ -130,6 +128,7 @@ If another extension depends on menu IDs, keep these constants stable.
 
 - `options.html` is visual only; behavior hooks rely on element IDs.
 - `options.js` imports shared defaults and maps form fields <-> storage.
+- Tabbed settings layout also relies on `data-tab-button` and `data-tab-panel` attributes for section switching.
 - Existing required control IDs:
   - `tabAdj`, `tabEnd`, `tabAct`
   - `cbButtonNew`, `cbPageNew`, `cbArchiveNew`, `cbSearchNew`
@@ -207,7 +206,7 @@ const target = oa?.url || buildArchiveRoutePlan(sourceUrl, {
 - Paywall prompt should not appear when `paywallPromptEnabled` is set to `false`.
 - Page context search works.
 - Link archive/search both work.
-- Action menu `Wayback Machine versions` opens picker (popup or fallback window).
+- Action menu `Wayback Machine versions` opens the in-page snapshot popup.
 - Action menu `Open settings` opens `options.html`.
 - Options save + reload persists all toggles/radio state.
 - `Refresh Extension` button reloads extension runtime.

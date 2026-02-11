@@ -94,6 +94,56 @@
             gap: 12px;
         }
 
+        .tab-strip {
+            display: flex;
+            gap: 8px;
+            margin: 0 0 14px;
+            padding: 6px;
+            border-radius: 16px;
+            border: 1px solid var(--hairline);
+            background: rgba(255, 255, 255, 0.52);
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .tab-button {
+            border: 1px solid transparent;
+            border-radius: 999px;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 620;
+            letter-spacing: -0.01em;
+            padding: 8px 14px;
+            cursor: pointer;
+            transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+        }
+
+        .tab-button:hover {
+            color: var(--text-main);
+            transform: translateY(-1px);
+        }
+
+        .tab-button.is-active {
+            color: #fff;
+            border-color: rgba(0, 93, 192, 0.38);
+            background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+            box-shadow: 0 8px 18px rgba(0, 113, 227, 0.25);
+        }
+
+        .tab-button:focus-visible {
+            outline: 2px solid rgba(0, 113, 227, 0.35);
+            outline-offset: 2px;
+        }
+
+        .tab-panel {
+            display: none;
+        }
+
+        .tab-panel.is-active {
+            display: block;
+        }
+
         .section h2 {
             margin: 0 0 14px;
             font-size: 0.98rem;
@@ -378,10 +428,20 @@
                 margin-top: 10px;
                 gap: 8px;
             }
+
+            .tab-strip {
+                width: 100%;
+            }
+
+            .tab-button {
+                flex: 1 1 0;
+                text-align: center;
+                padding: 8px 10px;
+            }
         }
 
         @media (min-width: 760px) {
-            .settings-grid {
+            .settings-grid--general {
                 grid-template-columns: 1fr 1fr;
                 align-items: start;
             }
@@ -446,174 +506,205 @@
             <p class="subtitle">Control how archive pages open and which actions grab focus.</p>
         </header>
 
-        <div class="settings-grid">
-            <section class="section">
-                <h2>Open archive pages in</h2>
-                <div class="stack">
-                    <label class="radio-option" for="tabAdj">
-                        <input type="radio" id="tabAdj" name="tabCtl">
-                        <span>
-                            <span class="option-title">New tab adjacent</span>
-                            <span class="option-hint">Opens beside your current tab.</span>
-                        </span>
-                    </label>
-                    <label class="radio-option" for="tabEnd">
-                        <input type="radio" id="tabEnd" name="tabCtl">
-                        <span>
-                            <span class="option-title">New tab at end</span>
-                            <span class="option-hint">Places archive tabs at the far right.</span>
-                        </span>
-                    </label>
-                    <label class="radio-option" for="tabAct">
-                        <input type="radio" id="tabAct" name="tabCtl">
-                        <span>
-                            <span class="option-title">Active for archive, adjacent for search</span>
-                            <span class="option-hint">Archive replaces the current tab, search still opens adjacent.</span>
-                        </span>
-                    </label>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>Activate new archive tab from</h2>
-                <div class="stack">
-                    <label class="switch-row">
-                        <span class="label">Toolbar button</span>
-                        <span class="switch">
-                            <input id="cbButtonNew" tabindex="1" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                    <label class="switch-row">
-                        <span class="label">Page search</span>
-                        <span class="switch">
-                            <input id="cbPageNew" tabindex="2" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                    <label class="switch-row">
-                        <span class="label">Archive link</span>
-                        <span class="switch">
-                            <input id="cbArchiveNew" tabindex="3" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                    <label class="switch-row">
-                        <span class="label">Search link</span>
-                        <span class="switch">
-                            <input id="cbSearchNew" tabindex="4" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>Resolver Behavior</h2>
-                <div class="stack">
-                    <div class="field-row">
-                        <label class="field-label" for="selPreferredMirror">Preferred mirror</label>
-                        <select id="selPreferredMirror" class="field-select">
-                            <option value="https://archive.is">archive.is</option>
-                            <option value="https://archive.ph">archive.ph</option>
-                            <option value="https://archive.today">archive.today</option>
-                        </select>
-                        <div class="field-help">Primary mirror used for archive and search routes.</div>
-                    </div>
-                    <label class="switch-row">
-                        <span class="label">Preload search fallback</span>
-                        <span class="switch">
-                            <input id="cbPreloadFallback" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                    <label class="switch-row">
-                        <span class="label">Auto-detect paywall prompt</span>
-                        <span class="switch">
-                            <input id="cbPaywallPromptEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2>Open-Access Providers</h2>
-                <div class="stack">
-                    <label class="switch-row">
-                        <span class="label">Enable OA resolver before archive</span>
-                        <span class="switch">
-                            <input id="cbOpenAccessEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <div class="field-row">
-                        <label class="field-label" for="inOpenAccessWaitMs">Resolver wait budget (ms)</label>
-                        <input id="inOpenAccessWaitMs" class="field-input" type="number" min="0" max="3000" step="100">
-                        <div class="field-help">How long to wait for OA results before archive fallback. Suggested: 700-1200.</div>
-                    </div>
-
-                    <label class="switch-row">
-                        <span class="label">Unpaywall</span>
-                        <span class="switch">
-                            <input id="cbUnpaywallEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <label class="switch-row">
-                        <span class="label">OpenAlex</span>
-                        <span class="switch">
-                            <input id="cbOpenAlexEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <label class="switch-row">
-                        <span class="label">Europe PMC</span>
-                        <span class="switch">
-                            <input id="cbEuropePmcEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <label class="switch-row">
-                        <span class="label">Crossref</span>
-                        <span class="switch">
-                            <input id="cbCrossrefEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <label class="switch-row">
-                        <span class="label">CORE</span>
-                        <span class="switch">
-                            <input id="cbCoreEnabled" type="checkbox">
-                            <span class="slider"></span>
-                        </span>
-                    </label>
-
-                    <div class="field-row">
-                        <label class="field-label" for="inUnpaywallEmail">Unpaywall email</label>
-                        <input id="inUnpaywallEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
-                        <div class="field-help">Required for Unpaywall API requests.</div>
-                    </div>
-
-                    <div class="field-row">
-                        <label class="field-label" for="inContactEmail">Contact email (optional)</label>
-                        <input id="inContactEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
-                        <div class="field-help">Used as polite contact where providers support it.</div>
-                    </div>
-
-                    <div class="field-row">
-                        <label class="field-label" for="inCoreApiKey">CORE API key (optional)</label>
-                        <input id="inCoreApiKey" class="field-input" type="password" autocomplete="off" placeholder="Paste CORE API key">
-                        <div class="field-help">Stored locally in browser sync settings.</div>
-                    </div>
-                </div>
-            </section>
+        <div class="tab-strip" role="tablist" aria-label="Settings tabs">
+            <button
+                id="tabButtonGeneral"
+                class="tab-button is-active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panelGeneral"
+                data-tab-button="general"
+            >
+                General
+            </button>
+            <button
+                id="tabButtonOpenAccess"
+                class="tab-button"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panelOpenAccess"
+                data-tab-button="open_access"
+            >
+                Open Access
+            </button>
         </div>
+
+        <section id="panelGeneral" class="tab-panel is-active" role="tabpanel" aria-labelledby="tabButtonGeneral" data-tab-panel="general">
+            <div class="settings-grid settings-grid--general">
+                <section class="section">
+                    <h2>Open archive pages in</h2>
+                    <div class="stack">
+                        <label class="radio-option" for="tabAdj">
+                            <input type="radio" id="tabAdj" name="tabCtl">
+                            <span>
+                                <span class="option-title">New tab adjacent</span>
+                                <span class="option-hint">Opens beside your current tab.</span>
+                            </span>
+                        </label>
+                        <label class="radio-option" for="tabEnd">
+                            <input type="radio" id="tabEnd" name="tabCtl">
+                            <span>
+                                <span class="option-title">New tab at end</span>
+                                <span class="option-hint">Places archive tabs at the far right.</span>
+                            </span>
+                        </label>
+                        <label class="radio-option" for="tabAct">
+                            <input type="radio" id="tabAct" name="tabCtl">
+                            <span>
+                                <span class="option-title">Active for archive, adjacent for search</span>
+                                <span class="option-hint">Archive replaces the current tab, search still opens adjacent.</span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Activate new archive tab from</h2>
+                    <div class="stack">
+                        <label class="switch-row">
+                            <span class="label">Toolbar button</span>
+                            <span class="switch">
+                                <input id="cbButtonNew" tabindex="1" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                        <label class="switch-row">
+                            <span class="label">Page search</span>
+                            <span class="switch">
+                                <input id="cbPageNew" tabindex="2" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                        <label class="switch-row">
+                            <span class="label">Archive link</span>
+                            <span class="switch">
+                                <input id="cbArchiveNew" tabindex="3" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                        <label class="switch-row">
+                            <span class="label">Search link</span>
+                            <span class="switch">
+                                <input id="cbSearchNew" tabindex="4" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+
+                <section class="section">
+                    <h2>Resolver Behavior</h2>
+                    <div class="stack">
+                        <div class="field-row">
+                            <label class="field-label" for="selPreferredMirror">Preferred mirror</label>
+                            <select id="selPreferredMirror" class="field-select">
+                                <option value="https://archive.is">archive.is</option>
+                                <option value="https://archive.ph">archive.ph</option>
+                                <option value="https://archive.today">archive.today</option>
+                            </select>
+                            <div class="field-help">Primary mirror used for archive and search routes.</div>
+                        </div>
+                        <label class="switch-row">
+                            <span class="label">Preload search fallback</span>
+                            <span class="switch">
+                                <input id="cbPreloadFallback" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                        <label class="switch-row">
+                            <span class="label">Auto-detect paywall prompt</span>
+                            <span class="switch">
+                                <input id="cbPaywallPromptEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <section id="panelOpenAccess" class="tab-panel" role="tabpanel" aria-labelledby="tabButtonOpenAccess" data-tab-panel="open_access" hidden>
+            <div class="settings-grid">
+                <section class="section">
+                    <h2>Open-Access Providers</h2>
+                    <div class="stack">
+                        <label class="switch-row">
+                            <span class="label">Enable OA resolver before archive</span>
+                            <span class="switch">
+                                <input id="cbOpenAccessEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <div class="field-row">
+                            <label class="field-label" for="inOpenAccessWaitMs">Resolver wait budget (ms)</label>
+                            <input id="inOpenAccessWaitMs" class="field-input" type="number" min="0" max="3000" step="100">
+                            <div class="field-help">How long to wait for OA results before archive fallback. Suggested: 700-1200.</div>
+                        </div>
+
+                        <label class="switch-row">
+                            <span class="label">Unpaywall</span>
+                            <span class="switch">
+                                <input id="cbUnpaywallEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <span class="label">OpenAlex</span>
+                            <span class="switch">
+                                <input id="cbOpenAlexEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <span class="label">Europe PMC</span>
+                            <span class="switch">
+                                <input id="cbEuropePmcEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <span class="label">Crossref</span>
+                            <span class="switch">
+                                <input id="cbCrossrefEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <label class="switch-row">
+                            <span class="label">CORE</span>
+                            <span class="switch">
+                                <input id="cbCoreEnabled" type="checkbox">
+                                <span class="slider"></span>
+                            </span>
+                        </label>
+
+                        <div class="field-row">
+                            <label class="field-label" for="inUnpaywallEmail">Unpaywall email</label>
+                            <input id="inUnpaywallEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
+                            <div class="field-help">Required for Unpaywall API requests.</div>
+                        </div>
+
+                        <div class="field-row">
+                            <label class="field-label" for="inContactEmail">Contact email (optional)</label>
+                            <input id="inContactEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
+                            <div class="field-help">Used as polite contact where providers support it.</div>
+                        </div>
+
+                        <div class="field-row">
+                            <label class="field-label" for="inCoreApiKey">CORE API key (optional)</label>
+                            <input id="inCoreApiKey" class="field-input" type="password" autocomplete="off" placeholder="Paste CORE API key">
+                            <div class="field-help">Stored locally in browser sync settings.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </section>
 
         <div class="footer">
             <div class="footer-actions">

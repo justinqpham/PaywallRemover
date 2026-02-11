@@ -1,5 +1,38 @@
 import { DEFAULT_SETTINGS, MIRROR_BASE, TAB_OPTION } from './src/settings_model.js';
 
+function setActiveSettingsTab(tabName) {
+    const buttons = document.querySelectorAll('[data-tab-button]');
+    const panels = document.querySelectorAll('[data-tab-panel]');
+
+    buttons.forEach((button) => {
+        const active = button.dataset.tabButton === tabName;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+
+    panels.forEach((panel) => {
+        const active = panel.dataset.tabPanel === tabName;
+        panel.classList.toggle('is-active', active);
+        panel.hidden = !active;
+    });
+}
+
+function initializeSettingsTabs() {
+    const buttons = Array.from(document.querySelectorAll('[data-tab-button]'));
+    if (buttons.length === 0) {
+        return;
+    }
+
+    buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+            setActiveSettingsTab(button.dataset.tabButton || '');
+        });
+    });
+
+    const initial = buttons.find((button) => button.classList.contains('is-active')) || buttons[0];
+    setActiveSettingsTab(initial.dataset.tabButton || '');
+}
+
 function readSettingsFromForm() {
     const tabOption = document.getElementById('tabEnd').checked
         ? TAB_OPTION.END
@@ -90,6 +123,7 @@ function refreshExtension() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initializeSettingsTabs();
     restoreOptions();
     document.getElementById('bSave').addEventListener('click', saveOptions);
     document.getElementById('bReloadExtension').addEventListener('click', refreshExtension);

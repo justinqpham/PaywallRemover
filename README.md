@@ -6,7 +6,7 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 
 - Toolbar action with OA-first resolution and archive fallback.
 - Context menu actions for archiving or searching links/pages.
-- Toolbar icon context action to open a Wayback snapshot picker anchored to the extension icon.
+- Toolbar icon context action to open an in-page Wayback snapshot popup.
 - Configurable tab placement and tab activation behavior.
 - Resolver pipeline with mirror-aware route planning.
 - Open-access provider chain (Unpaywall, OpenAlex, Europe PMC, Crossref, CORE).
@@ -36,7 +36,7 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
   - `Archive -> Archive link`
   - `Archive -> Search link`
 - Right-click extension icon:
-  - `Wayback Machine versions` (opens icon-anchored version picker; falls back to a compact popup window when blocked)
+  - `Wayback Machine versions` (opens in-page snapshot popup on the active tab)
 - On pages with likely paywall signals:
   - in-page prompt appears with `Open Accessible Version`
 
@@ -55,6 +55,9 @@ To enable best open-access results:
 
 Open extension options from the action menu (`Open settings`) or from `chrome://extensions/` to configure:
 
+- Tabs:
+  - `General`
+  - `Open Access`
 - Tab behavior:
   - New tab adjacent
   - New tab at end
@@ -116,8 +119,6 @@ paywallRemover/
 ├── options.html
 ├── options.js
 ├── paywall_prompt.js
-├── wayback_picker.html
-├── wayback_picker.js
 ├── src/
 │   ├── archive_client.js
 │   ├── access_resolver.js
@@ -147,7 +148,7 @@ MIT License. See `LICENSE`.
 - Added API host permissions for OA provider calls.
 - Added instant placeholder tab flow for faster perceived click response.
 - Added `Refresh Extension` button in settings UI.
-- Added Wayback snapshot picker action (`Wayback Machine versions`) with popup/window fallback.
+- Added Wayback snapshot picker action (`Wayback Machine versions`) as an in-page popup.
 - Added archive snapshot auto-reader mode (text-only view).
 - Added paywall signal detection prompt with one-click accessible open action.
 - Added settings toggle for paywall prompt auto-detection.

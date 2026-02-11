@@ -1,6 +1,7 @@
 import { buildArchiveRoutePlan, buildPrimarySearchRoute } from './src/access_resolver.js';
 import { resolveOpenAccessTarget } from './src/open_access_resolver.js';
 import { DEFAULT_SETTINGS, TAB_OPTION } from './src/settings_model.js';
+import { buildWaybackCalendarUrl } from './src/archive_client.js';
 
 const MENU_ID = Object.freeze({
     PAGE_SEARCH: 'page_search_archive',
@@ -11,10 +12,10 @@ const MENU_ID = Object.freeze({
     ACTION_SETTINGS: 'action_open_settings'
 });
 
-const WAYBACK_PICKER_PATH = 'wayback_picker.html';
 const MESSAGE_TYPE = Object.freeze({
-    WAYBACK_PICKER_READY: 'wayback_picker_ready',
-    OPEN_FROM_PAYWALL_PROMPT: 'open_from_paywall_prompt'
+    OPEN_FROM_PAYWALL_PROMPT: 'open_from_paywall_prompt',
+    SHOW_WAYBACK_OVERLAY: 'show_wayback_overlay',
+    FETCH_WAYBACK_SNAPSHOTS: 'fetch_wayback_snapshots'
 });
 const ARCHIVE_READER_HOSTS = Object.freeze(new Set([
     'archive.is',
@@ -156,62 +157,129 @@ async function getActiveTab() {
     return activeTab || null;
 }
 
-function buildWaybackPickerPath(sourceUrl, tabId) {
-    const params = new URLSearchParams();
-    params.set('url', sourceUrl);
-    if (typeof tabId === 'number') {
-        params.set('tabId', String(tabId));
+function formatWaybackTimestamp(timestamp) {
+    const value = String(timestamp || '');
+    if (!/^\d{14}$/.test(value)) {
+        return value;
     }
-    return `${WAYBACK_PICKER_PATH}?${params.toString()}`;
+
+    const yyyy = value.slice(0, 4);
+    const mm = value.slice(4, 6);
+    const dd = value.slice(6, 8);
+    const hh = value.slice(8, 10);
+    const min = value.slice(10, 12);
+    const ss = value.slice(12, 14);
+    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} UTC`;
 }
 
-async function openWaybackPickerNearIcon(sourceUrl, tabId) {
-    const popupPath = buildWaybackPickerPath(sourceUrl, tabId);
-
-    try {
-        await chrome.action.setPopup({ popup: popupPath });
-    } catch (error) {
+async function showWaybackOverlayOnTab(tab, sourceUrl) {
+    const tabId = tab?.id;
+    if (typeof tabId !== 'number' || !isSupportedUrl(sourceUrl)) {
         return false;
     }
 
-    if (chrome.action.openPopup) {
-        try {
-            await chrome.action.openPopup();
-            return true;
-        } catch (error) {
-            return false;
+    const payload = {
+        type: MESSAGE_TYPE.SHOW_WAYBACK_OVERLAY,
+        url: sourceUrl,
+        title: String(tab?.title || '')
+    };
+
+    try {
+        await chrome.tabs.sendMessage(tabId, payload);
+        return true;
+    } catch (error) {
+        // Existing tabs may not have the content script loaded yet (e.g. extension reloaded).
+    }
+
+    if (!chrome.scripting?.executeScript) {
+        return false;
+    }
+
+    try {
+        await chrome.scripting.executeScript({
+            target: { tabId },
+            files: ['paywall_prompt.js']
+        });
+        await chrome.tabs.sendMessage(tabId, payload);
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
+
+function normalizeWaybackSnapshots(payload, originalUrl) {
+    if (!Array.isArray(payload) || payload.length < 2) {
+        return [];
+    }
+
+    const rows = payload.slice(1);
+    const snapshots = [];
+    const seenTimestamps = new Set();
+
+    for (const row of rows) {
+        if (!Array.isArray(row) || row.length < 1) {
+            continue;
+        }
+
+        const timestamp = String(row[0] || '');
+        if (!/^\d{14}$/.test(timestamp) || seenTimestamps.has(timestamp)) {
+            continue;
+        }
+        seenTimestamps.add(timestamp);
+
+        const original = String(row[1] || originalUrl);
+        const status = String(row[2] || '');
+        const url = `https://web.archive.org/web/${timestamp}/${original}`;
+        snapshots.push({
+            timestamp,
+            status,
+            label: `${formatWaybackTimestamp(timestamp)}${status ? ` (${status})` : ''}`,
+            url
+        });
+
+        if (snapshots.length >= 140) {
+            break;
         }
     }
 
-    return false;
+    return snapshots;
 }
 
-async function openWaybackPickerWindow(sourceUrl, tabId) {
-    const popupUrl = chrome.runtime.getURL(buildWaybackPickerPath(sourceUrl, tabId));
-    const currentWindow = await chrome.windows.getCurrent();
-    const currentWidth = Number(currentWindow?.width) || 1200;
-    const currentHeight = Number(currentWindow?.height) || 900;
-    const width = Math.min(460, Math.max(360, Math.round(currentWidth * 0.3)));
-    const height = Math.min(500, Math.max(360, Math.round(currentHeight * 0.42)));
+async function fetchWaybackSnapshots(originalUrl) {
+    const endpoint = new URL('https://web.archive.org/cdx/search/cdx');
+    endpoint.searchParams.set('url', originalUrl);
+    endpoint.searchParams.set('output', 'json');
+    endpoint.searchParams.set('fl', 'timestamp,original,statuscode');
+    endpoint.searchParams.set('filter', 'statuscode:200');
+    endpoint.searchParams.set('collapse', 'timestamp:10');
+    endpoint.searchParams.set('limit', '200');
+    endpoint.searchParams.set('sort', 'reverse');
 
-    let left;
-    let top;
-    if (typeof currentWindow?.left === 'number' && typeof currentWindow?.width === 'number') {
-        left = currentWindow.left + currentWindow.width - width - 24;
-    }
-    if (typeof currentWindow?.top === 'number') {
-        top = currentWindow.top + 64;
+    const response = await fetch(endpoint.toString(), { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`Wayback request failed (${response.status})`);
     }
 
-    await chrome.windows.create({
-        url: popupUrl,
-        type: 'popup',
-        width,
-        height,
-        left,
-        top,
-        focused: true
-    });
+    const payload = await response.json();
+    const snapshots = normalizeWaybackSnapshots(payload, originalUrl);
+    return {
+        snapshots,
+        calendarUrl: buildWaybackCalendarUrl(originalUrl)
+    };
+}
+
+async function handleFetchWaybackSnapshots(message) {
+    const sourceUrl = String(message?.url || '');
+    if (!isSupportedUrl(sourceUrl)) {
+        return { ok: false, error: 'unsupported_url', snapshots: [] };
+    }
+
+    try {
+        const result = await fetchWaybackSnapshots(sourceUrl);
+        return { ok: true, ...result };
+    } catch (error) {
+        return { ok: false, error: 'wayback_fetch_failed', snapshots: [], calendarUrl: buildWaybackCalendarUrl(sourceUrl) };
+    }
 }
 
 async function handleOpenFromPaywallPrompt(message, sender) {
@@ -232,10 +300,6 @@ async function handleOpenFromPaywallPrompt(message, sender) {
 
 function onRuntimeMessage(message, sender, sendResponse) {
     switch (message?.type) {
-        case MESSAGE_TYPE.WAYBACK_PICKER_READY:
-            chrome.action.setPopup({ popup: '' }).catch(() => {});
-            sendResponse({ ok: true });
-            return;
         case MESSAGE_TYPE.OPEN_FROM_PAYWALL_PROMPT:
             (async () => {
                 try {
@@ -244,6 +308,16 @@ function onRuntimeMessage(message, sender, sendResponse) {
                 } catch (error) {
                     console.error('Paywall prompt open failed:', error);
                     sendResponse({ ok: false, error: 'open_failed' });
+                }
+            })();
+            return true;
+        case MESSAGE_TYPE.FETCH_WAYBACK_SNAPSHOTS:
+            (async () => {
+                try {
+                    const result = await handleFetchWaybackSnapshots(message);
+                    sendResponse(result);
+                } catch (error) {
+                    sendResponse({ ok: false, error: 'wayback_fetch_failed', snapshots: [] });
                 }
             })();
             return true;
@@ -653,9 +727,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
                     return;
                 }
 
-                const opened = await openWaybackPickerNearIcon(sourceUrl, sourceTab?.id);
+                const opened = await showWaybackOverlayOnTab(sourceTab, sourceUrl);
                 if (!opened) {
-                    await openWaybackPickerWindow(sourceUrl, sourceTab?.id);
+                    const settings = await getSettings();
+                    const calendarUrl = buildWaybackCalendarUrl(sourceUrl);
+                    await createTabNearCurrent(calendarUrl, settings.activateButtonNew, settings.tabOption === TAB_OPTION.END);
                 }
                 return;
             }
