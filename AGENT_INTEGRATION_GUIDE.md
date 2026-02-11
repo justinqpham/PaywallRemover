@@ -10,6 +10,7 @@ This document is the technical handoff for integrating this extension's archive 
 - Entry files:
   - `manifest.json`
   - `service_worker.js`
+  - `paywall_prompt.js`
   - `options.html`
   - `options.js`
   - `wayback_picker.html`
@@ -25,6 +26,7 @@ This document is the technical handoff for integrating this extension's archive 
 - UI events trigger from:
   - Toolbar click (`chrome.action.onClicked`)
   - Context menus (`chrome.contextMenus.onClicked`)
+  - Content-script prompt (`chrome.runtime.sendMessage` from `paywall_prompt.js`)
 - Action context menu includes a Wayback snapshot picker entry (`contexts: ['action']`).
 - Wayback picker attempts `chrome.action.openPopup()` first (icon-anchored) and falls back to a positioned popup window.
 - Action context menu includes `Open settings`, which opens `options.html` in a new tab.
@@ -49,6 +51,7 @@ Current keys:
 - `activateSearchNew` (`boolean`)
 - `preferredMirror` (`string`) default `https://archive.is`
 - `preloadSearchFallback` (`boolean`) default `false`
+- `paywallPromptEnabled` (`boolean`) default `true`
 - `openAccessEnabled` (`boolean`) default `true`
 - `openAccessWaitMs` (`number`) default `900`
 - `unpaywallEnabled` (`boolean`) default `true`
@@ -105,6 +108,7 @@ Important: other agents should read defaults from `DEFAULT_SETTINGS` rather than
 - Uses resolver plan for archive actions and optional preloaded fallback.
 - Uses OA resolver with short wait budget before archive fallback.
 - Applies automatic reader-mode transform on archive snapshot tabs (text-only render).
+- Handles in-page paywall prompt requests via runtime message and opens archive/OA route.
 
 Menu IDs currently:
 
@@ -115,6 +119,11 @@ Menu IDs currently:
 - `action_wayback_versions`
 - `action_open_settings`
 
+Runtime message types:
+
+- `wayback_picker_ready`
+- `open_from_paywall_prompt`
+
 If another extension depends on menu IDs, keep these constants stable.
 
 ## 6) Options UI Integration Notes
@@ -124,7 +133,7 @@ If another extension depends on menu IDs, keep these constants stable.
 - Existing required control IDs:
   - `tabAdj`, `tabEnd`, `tabAct`
   - `cbButtonNew`, `cbPageNew`, `cbArchiveNew`, `cbSearchNew`
-  - `selPreferredMirror`, `cbPreloadFallback`
+  - `selPreferredMirror`, `cbPreloadFallback`, `cbPaywallPromptEnabled`
   - `cbOpenAccessEnabled`, `inOpenAccessWaitMs`
   - `cbUnpaywallEnabled`, `cbOpenAlexEnabled`, `cbEuropePmcEnabled`, `cbCrossrefEnabled`, `cbCoreEnabled`
   - `inUnpaywallEmail`, `inContactEmail`, `inCoreApiKey`
@@ -141,6 +150,10 @@ Minimum required permissions for this feature set:
 - `scripting`
 - `activeTab`
 - `storage`
+
+Content script registration:
+
+- `paywall_prompt.js` on `http://*/*` and `https://*/*` at `document_idle`.
 
 Background must remain module-enabled:
 
@@ -190,6 +203,8 @@ const target = oa?.url || buildArchiveRoutePlan(sourceUrl, {
 - Toolbar click opens archive route.
 - Toolbar click should open a tab immediately (placeholder), then navigate to final target.
 - Archive snapshot should auto-convert to reader mode (text-only) when content extraction succeeds.
+- Likely paywalled pages should show prompt banner and `Open Accessible Version` action should trigger resolver.
+- Paywall prompt should not appear when `paywallPromptEnabled` is set to `false`.
 - Page context search works.
 - Link archive/search both work.
 - Action menu `Wayback Machine versions` opens picker (popup or fallback window).

@@ -13,7 +13,8 @@ const MENU_ID = Object.freeze({
 
 const WAYBACK_PICKER_PATH = 'wayback_picker.html';
 const MESSAGE_TYPE = Object.freeze({
-    WAYBACK_PICKER_READY: 'wayback_picker_ready'
+    WAYBACK_PICKER_READY: 'wayback_picker_ready',
+    OPEN_FROM_PAYWALL_PROMPT: 'open_from_paywall_prompt'
 });
 const ARCHIVE_READER_HOSTS = Object.freeze(new Set([
     'archive.is',
@@ -213,13 +214,42 @@ async function openWaybackPickerWindow(sourceUrl, tabId) {
     });
 }
 
-function onRuntimeMessage(message, sender, sendResponse) {
-    if (message?.type !== MESSAGE_TYPE.WAYBACK_PICKER_READY) {
-        return;
+async function handleOpenFromPaywallPrompt(message, sender) {
+    const sourceUrl = String(message?.url || '');
+    if (!isSupportedUrl(sourceUrl)) {
+        return { ok: false, error: 'unsupported_url' };
     }
 
-    chrome.action.setPopup({ popup: '' }).catch(() => {});
-    sendResponse({ ok: true });
+    const settings = await getSettings();
+    await openArchivePage(sourceUrl, settings.activateButtonNew, settings.tabOption, settings, {
+        source: 'page',
+        title: String(message?.title || ''),
+        tabId: sender?.tab?.id
+    });
+
+    return { ok: true };
+}
+
+function onRuntimeMessage(message, sender, sendResponse) {
+    switch (message?.type) {
+        case MESSAGE_TYPE.WAYBACK_PICKER_READY:
+            chrome.action.setPopup({ popup: '' }).catch(() => {});
+            sendResponse({ ok: true });
+            return;
+        case MESSAGE_TYPE.OPEN_FROM_PAYWALL_PROMPT:
+            (async () => {
+                try {
+                    const result = await handleOpenFromPaywallPrompt(message, sender);
+                    sendResponse(result);
+                } catch (error) {
+                    console.error('Paywall prompt open failed:', error);
+                    sendResponse({ ok: false, error: 'open_failed' });
+                }
+            })();
+            return true;
+        default:
+            return;
+    }
 }
 
 async function createTabNearCurrent(url, shouldActivate, placeAtEnd) {

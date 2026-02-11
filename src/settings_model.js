@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     activateSearchNew: true,
     preferredMirror: MIRROR_BASE.ARCHIVE_IS,
     preloadSearchFallback: false,
+    paywallPromptEnabled: true,
     openAccessEnabled: true,
     openAccessWaitMs: 900,
     unpaywallEnabled: true,

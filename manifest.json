@@ -12,6 +12,13 @@
       "service_worker": "service_worker.js",
       "type": "module"
    },
+   "content_scripts": [
+      {
+         "matches": [ "https://*/*", "http://*/*" ],
+         "js": [ "paywall_prompt.js" ],
+         "run_at": "document_idle"
+      }
+   ],
    "content_security_policy": {
    },
    "description": "Open current pages in archive mirrors with one click",

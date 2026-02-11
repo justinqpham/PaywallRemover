@@ -13,6 +13,7 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 - Optional preloaded fallback tab for archive actions.
 - Instant tab feedback (`about:blank` placeholder while target resolves).
 - Automatic text-only reader view on archive snapshot pages.
+- In-page paywall prompt that can open an accessible version in one click.
 - Settings UI includes `Refresh Extension` action.
 - Shared `chrome.storage.sync` settings.
 - Reusable archive URL core for integration into other extensions.
@@ -35,7 +36,9 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
   - `Archive -> Archive link`
   - `Archive -> Search link`
 - Right-click extension icon:
-  - `Wayback Machine versions` (opens icon-anchored version picker + calendar shortcut)
+  - `Wayback Machine versions` (opens icon-anchored version picker; falls back to a compact popup window when blocked)
+- On pages with likely paywall signals:
+  - in-page prompt appears with `Open Accessible Version`
 
 ## OA Setup
 
@@ -60,6 +63,7 @@ Open extension options from the action menu (`Open settings`) or from `chrome://
 - Resolver behavior:
   - preferred archive mirror
   - preload archive search fallback
+  - auto-detect paywall prompt (on/off)
   - open-access wait budget
 - Open-access providers:
   - enable/disable provider toggles
@@ -83,6 +87,8 @@ Expected behavior:
 - If OA does not resolve in time, archive route opens.
 - If archive has no snapshot, archive search page may show no results.
 - If archive snapshot loads successfully, extension auto-switches to a text-only reader layout.
+- If paywall signals are detected and `Auto-detect paywall prompt` is enabled, banner appears with `Open Accessible Version`.
+- If `Auto-detect paywall prompt` is disabled, no paywall banner is shown.
 
 ## Known Limits
 
@@ -93,6 +99,7 @@ Expected behavior:
 ## Architecture
 
 - Manifest V3 service worker (`service_worker.js`) now runs as an ES module.
+- Content script (`paywall_prompt.js`) performs client-side paywall signal detection.
 - Shared modules:
   - `src/archive_client.js` for archive URL building/normalization.
   - `src/access_resolver.js` for route planning across mirrors.
@@ -108,6 +115,7 @@ paywallRemover/
 ├── service_worker.js
 ├── options.html
 ├── options.js
+├── paywall_prompt.js
 ├── wayback_picker.html
 ├── wayback_picker.js
 ├── src/
@@ -139,6 +147,10 @@ MIT License. See `LICENSE`.
 - Added API host permissions for OA provider calls.
 - Added instant placeholder tab flow for faster perceived click response.
 - Added `Refresh Extension` button in settings UI.
+- Added Wayback snapshot picker action (`Wayback Machine versions`) with popup/window fallback.
+- Added archive snapshot auto-reader mode (text-only view).
+- Added paywall signal detection prompt with one-click accessible open action.
+- Added settings toggle for paywall prompt auto-detection.
 
 ### v0.10.0
 - Added archive resolver planning with mirror ordering.

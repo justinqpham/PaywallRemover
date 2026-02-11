@@ -13,6 +13,7 @@ function readSettingsFromForm() {
         activateSearchNew: document.getElementById('cbSearchNew').checked,
         preferredMirror: document.getElementById('selPreferredMirror').value,
         preloadSearchFallback: document.getElementById('cbPreloadFallback').checked,
+        paywallPromptEnabled: document.getElementById('cbPaywallPromptEnabled').checked,
         openAccessEnabled: document.getElementById('cbOpenAccessEnabled').checked,
         openAccessWaitMs: Math.max(0, Number(document.getElementById('inOpenAccessWaitMs').value) || 0),
         unpaywallEnabled: document.getElementById('cbUnpaywallEnabled').checked,
@@ -51,6 +52,7 @@ function applySettingsToForm(settings) {
     }
 
     document.getElementById('cbPreloadFallback').checked = Boolean(settings.preloadSearchFallback);
+    document.getElementById('cbPaywallPromptEnabled').checked = Boolean(settings.paywallPromptEnabled);
     document.getElementById('cbOpenAccessEnabled').checked = Boolean(settings.openAccessEnabled);
     document.getElementById('inOpenAccessWaitMs').value = String(Math.max(0, Number(settings.openAccessWaitMs) || 900));
 
