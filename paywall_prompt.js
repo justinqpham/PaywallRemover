@@ -58,6 +58,13 @@
         'paywall',
         'metered'
     ];
+    const LINK_PREVIEW_IGNORE_SELECTOR = [
+        '#linkpreview-preview',
+        '#linkpreview-overlay',
+        '#linkpreview-loader',
+        '#linkpreview-error',
+        '#linkpreview-paywall-prompt'
+    ].join(', ');
 
     function hasSessionDismissal() {
         try {
@@ -75,8 +82,38 @@
         }
     }
 
+    function isInsideIgnoredPreviewNode(node) {
+        if (!node || typeof node.closest !== 'function') {
+            return false;
+        }
+        return Boolean(node.closest(LINK_PREVIEW_IGNORE_SELECTOR));
+    }
+
+    function readDetectionBodyText() {
+        const body = document.body;
+        if (!body) {
+            return '';
+        }
+
+        if (!document.querySelector(LINK_PREVIEW_IGNORE_SELECTOR)) {
+            return String(body.innerText || '');
+        }
+
+        try {
+            const clone = body.cloneNode(true);
+            clone.querySelectorAll(LINK_PREVIEW_IGNORE_SELECTOR).forEach((node) => node.remove());
+            return String(clone.innerText || '');
+        } catch (error) {
+            return String(body.innerText || '');
+        }
+    }
+
+    function hasActiveLinkPreview() {
+        return Boolean(document.querySelector('#linkpreview-preview'));
+    }
+
     function detectTextSignals() {
-        const text = String(document.body?.innerText || '').slice(0, 28000);
+        const text = readDetectionBodyText().slice(0, 28000);
         if (!text) {
             return { score: 0, hits: 0 };
         }
@@ -108,6 +145,9 @@
         for (let i = nodes.length - 1; i >= 0 && checked < 140; i -= 1) {
             const node = nodes[i];
             checked += 1;
+            if (isInsideIgnoredPreviewNode(node)) {
+                continue;
+            }
             const style = window.getComputedStyle(node);
             if (!style || style.display === 'none' || style.visibility === 'hidden') {
                 continue;
@@ -145,7 +185,8 @@
     function detectBlockSignals() {
         const bodyStyle = window.getComputedStyle(document.body || document.documentElement);
         const rootStyle = window.getComputedStyle(document.documentElement);
-        const bodyLocked = /(hidden|clip)/i.test(bodyStyle?.overflowY || '') || /(hidden|clip)/i.test(rootStyle?.overflowY || '');
+        const bodyLocked = !hasActiveLinkPreview()
+            && (/(hidden|clip)/i.test(bodyStyle?.overflowY || '') || /(hidden|clip)/i.test(rootStyle?.overflowY || ''));
         const tallPage = (document.documentElement.scrollHeight || 0) > window.innerHeight * 1.3;
         let score = bodyLocked && tallPage ? 1 : 0;
 
@@ -155,6 +196,9 @@
             checked += 1;
             if (checked > 40) {
                 break;
+            }
+            if (isInsideIgnoredPreviewNode(node)) {
+                continue;
             }
             const style = window.getComputedStyle(node);
             if (!style) {
@@ -261,7 +305,7 @@
         removeWaybackPopup();
     }
 
-    function requestWaybackSnapshots(sourceUrl, callback) {
+    function requestWaybackSnapshots(sourceUrl, mode, callback) {
         if (!chrome.runtime?.sendMessage) {
             callback({ ok: false, error: 'bridge_unavailable', snapshots: [] });
             return;
@@ -269,7 +313,8 @@
 
         chrome.runtime.sendMessage({
             type: MESSAGE_TYPE.FETCH_WAYBACK_SNAPSHOTS,
-            url: sourceUrl
+            url: sourceUrl,
+            mode: mode === 'full' ? 'full' : 'quick'
         }, (response) => {
             if (chrome.runtime?.lastError) {
                 callback({ ok: false, error: 'bridge_error', snapshots: [] });
@@ -279,7 +324,31 @@
         });
     }
 
-    function loadWaybackSnapshots(sourceUrl, selectEl, statusEl, openBtn, calendarBtn) {
+    function populateWaybackSnapshotOptions(selectEl, snapshots, preferredValue = '') {
+        selectEl.innerHTML = '';
+
+        for (const snapshot of snapshots) {
+            const option = document.createElement('option');
+            option.value = snapshot.url || '';
+            option.textContent = snapshot.label || snapshot.timestamp || 'Snapshot';
+            selectEl.append(option);
+        }
+
+        if (!preferredValue) {
+            return;
+        }
+
+        const hasMatch = snapshots.some((snapshot) => snapshot?.url === preferredValue);
+        if (hasMatch) {
+            selectEl.value = preferredValue;
+        }
+    }
+
+    function loadWaybackSnapshots(sourceUrl, selectEl, statusEl, openBtn, calendarBtn, requestState, mode = 'quick') {
+        const requestId = Number(requestState?.id || 0) + 1;
+        requestState.id = requestId;
+        const isCurrent = () => requestState.id === requestId;
+
         selectEl.disabled = true;
         openBtn.disabled = true;
         calendarBtn.disabled = true;
@@ -288,9 +357,14 @@
         loadingOption.textContent = 'Loading snapshots...';
         loadingOption.value = '';
         selectEl.append(loadingOption);
-        statusEl.textContent = 'Fetching versions from Wayback Machine...';
+        statusEl.textContent = mode === 'full'
+            ? 'Refreshing snapshot list...'
+            : 'Fetching versions from Wayback Machine...';
 
-        requestWaybackSnapshots(sourceUrl, (response) => {
+        requestWaybackSnapshots(sourceUrl, mode, (response) => {
+            if (!isCurrent()) {
+                return;
+            }
             selectEl.innerHTML = '';
 
             if (!response?.ok) {
@@ -325,16 +399,46 @@
                 return;
             }
 
-            for (const snapshot of snapshots) {
-                const option = document.createElement('option');
-                option.value = snapshot.url || '';
-                option.textContent = snapshot.label || snapshot.timestamp || 'Snapshot';
-                selectEl.append(option);
-            }
-
+            populateWaybackSnapshotOptions(selectEl, snapshots);
             selectEl.disabled = false;
             openBtn.disabled = false;
-            statusEl.textContent = `Found ${snapshots.length} archived version${snapshots.length === 1 ? '' : 's'}.`;
+            statusEl.textContent = response.partial
+                ? 'Loaded latest snapshot. Fetching full version list...'
+                : `Found ${snapshots.length} archived version${snapshots.length === 1 ? '' : 's'}.`;
+
+            if (mode !== 'quick' || !response.partial) {
+                return;
+            }
+
+            requestWaybackSnapshots(sourceUrl, 'full', (fullResponse) => {
+                if (!isCurrent()) {
+                    return;
+                }
+
+                if (!fullResponse?.ok) {
+                    statusEl.textContent = `Showing latest snapshot (${snapshots.length}). Full list is temporarily unavailable.`;
+                    return;
+                }
+
+                const fullSnapshots = Array.isArray(fullResponse.snapshots) ? fullResponse.snapshots : [];
+                if (fullResponse.calendarUrl) {
+                    calendarBtn.dataset.url = fullResponse.calendarUrl;
+                }
+                calendarBtn.disabled = !calendarBtn.dataset.url;
+
+                if (fullSnapshots.length === 0) {
+                    statusEl.textContent = `Showing latest snapshot (${snapshots.length}). Full list is temporarily unavailable.`;
+                    return;
+                }
+
+                const selectedValue = selectEl.value;
+                populateWaybackSnapshotOptions(selectEl, fullSnapshots, selectedValue);
+                selectEl.disabled = false;
+                openBtn.disabled = false;
+                statusEl.textContent = fullResponse.partial
+                    ? `Showing ${fullSnapshots.length} version${fullSnapshots.length === 1 ? '' : 's'} (partial list).`
+                    : `Found ${fullSnapshots.length} archived version${fullSnapshots.length === 1 ? '' : 's'}.`;
+            });
         });
     }
 
@@ -402,6 +506,7 @@
 
         const status = document.createElement('div');
         status.style.cssText = 'margin-top:8px;font-size:11px;line-height:1.35;color:#cbd5e1;min-height:1em;';
+        const requestState = { id: 0 };
 
         openBtn.addEventListener('click', () => {
             if (!selectEl.value) {
@@ -421,7 +526,7 @@
         });
 
         refreshBtn.addEventListener('click', () => {
-            loadWaybackSnapshots(sourceUrl, selectEl, status, openBtn, calendarBtn);
+            loadWaybackSnapshots(sourceUrl, selectEl, status, openBtn, calendarBtn, requestState, 'full');
         });
 
         dismissBtn.addEventListener('click', () => {
@@ -433,7 +538,7 @@
         wrap.append(title, urlLine, fieldLabel, selectEl, actionsTop, actionsBottom, status);
         document.documentElement.appendChild(wrap);
 
-        loadWaybackSnapshots(sourceUrl, selectEl, status, openBtn, calendarBtn);
+        loadWaybackSnapshots(sourceUrl, selectEl, status, openBtn, calendarBtn, requestState, 'quick');
     }
 
     function openAccessibleVersion(statusEl, buttonEl) {

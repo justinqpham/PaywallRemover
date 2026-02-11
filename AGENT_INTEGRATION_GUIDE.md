@@ -2,6 +2,8 @@
 
 This document is the technical handoff for integrating this extension's archive actions into another Chromium extension (for example, a preview-window header action).
 
+Note: this guide reflects the simplified settings model requested for the next integration pass.
+
 ## 1) Current Project Snapshot
 
 - Extension name: `Paywall Remover`
@@ -29,26 +31,21 @@ This document is the technical handoff for integrating this extension's archive 
 - Action context menu includes `Open settings`, which opens `options.html` in a new tab.
 - Event handlers load persisted settings from `chrome.storage.sync`.
 - URL targets are converted into archive URLs through shared core modules.
-- Navigation is executed through `chrome.tabs.create` or `chrome.tabs.update`.
-- For non-active-tab flows, a placeholder tab opens immediately and is then updated to the resolved target.
+- Toolbar click behavior should be fixed: resolve the best accessible target, then open it in the current tab (`chrome.tabs.update` on active tab).
+- No user-facing tab-placement settings should be exposed for toolbar flow.
 
 ## 3) Storage Contract (`chrome.storage.sync`)
 
 Defined defaults are centralized in `src/settings_model.js` via `DEFAULT_SETTINGS`.
 
-Current keys:
+Simplified keys to keep:
 
-- `tabOption` (`number`)
-  - `0` adjacent tab
-  - `1` tab at end
-  - `2` replace current tab for archive actions
-- `activateButtonNew` (`boolean`)
-- `activatePageNew` (`boolean`)
-- `activateArchiveNew` (`boolean`)
-- `activateSearchNew` (`boolean`)
 - `preferredMirror` (`string`) default `https://archive.is`
 - `preloadSearchFallback` (`boolean`) default `false`
 - `paywallPromptEnabled` (`boolean`) default `true`
+
+Resolver behavior + open-access settings:
+
 - `openAccessEnabled` (`boolean`) default `true`
 - `openAccessWaitMs` (`number`) default `900`
 - `unpaywallEnabled` (`boolean`) default `true`
@@ -59,6 +56,14 @@ Current keys:
 - `unpaywallEmail` (`string`) default `''`
 - `contactEmail` (`string`) default `''`
 - `coreApiKey` (`string`) default `''`
+
+Keys to remove from settings/UI:
+
+- `tabOption`
+- `activateButtonNew`
+- `activatePageNew`
+- `activateArchiveNew`
+- `activateSearchNew`
 
 Important: other agents should read defaults from `DEFAULT_SETTINGS` rather than hardcoding fallback values.
 
@@ -75,9 +80,9 @@ Important: other agents should read defaults from `DEFAULT_SETTINGS` rather than
 
 ### `src/settings_model.js`
 
-- `TAB_OPTION` enum object
 - `MIRROR_BASE` mirror constants
 - `DEFAULT_SETTINGS` immutable defaults object
+- Simplified model includes only active resolver/provider keys (no tab-placement or activation keys).
 
 ### `src/access_resolver.js`
 
@@ -100,12 +105,13 @@ Important: other agents should read defaults from `DEFAULT_SETTINGS` rather than
 
 - Validates URLs (`http/https`) before opening archive actions.
 - Creates/refreshes context menu tree on install.
-- Applies tab placement logic based on `tabOption`.
-- Uses activation flags based on action source.
+- Toolbar click opens the resolved destination in the current tab.
+- Context-menu archive/search actions open in adjacent tabs.
 - Uses resolver plan for archive actions and optional preloaded fallback.
 - Uses OA resolver with short wait budget before archive fallback.
 - Applies automatic reader-mode transform on archive snapshot tabs (text-only render).
 - Handles in-page paywall prompt requests via runtime message and opens archive/OA route.
+- Paywall signal detection in `paywall_prompt.js` ignores LinkPreview preview UI containers (`#linkpreview-preview`, overlay/loader/error/prompt nodes) to prevent duplicate detections.
 
 Menu IDs currently:
 
@@ -129,9 +135,19 @@ If another extension depends on menu IDs, keep these constants stable.
 - `options.html` is visual only; behavior hooks rely on element IDs.
 - `options.js` imports shared defaults and maps form fields <-> storage.
 - Tabbed settings layout also relies on `data-tab-button` and `data-tab-panel` attributes for section switching.
-- Existing required control IDs:
-  - `tabAdj`, `tabEnd`, `tabAct`
-  - `cbButtonNew`, `cbPageNew`, `cbArchiveNew`, `cbSearchNew`
+- Remove these settings sections from UI:
+  - `Open archive pages in`
+  - `Activate new archive tab from`
+- Keep one simplified structure:
+  - General tab:
+    - preferred mirror
+    - preload fallback
+    - paywall prompt toggle
+  - Open Access tab:
+    - resolver behavior controls (`openAccessEnabled`, `openAccessWaitMs`) in the same section as provider controls
+    - provider toggles (`unpaywall/openAlex/europePmc/crossref/core`)
+    - provider credential fields (`unpaywallEmail`, `contactEmail`, `coreApiKey`)
+- Required IDs that should remain stable for integration:
   - `selPreferredMirror`, `cbPreloadFallback`, `cbPaywallPromptEnabled`
   - `cbOpenAccessEnabled`, `inOpenAccessWaitMs`
   - `cbUnpaywallEnabled`, `cbOpenAlexEnabled`, `cbEuropePmcEnabled`, `cbCrossrefEnabled`, `cbCoreEnabled`
@@ -183,7 +199,7 @@ Recommended approach:
 3. On preview-header button click:
    - resolve source URL from preview state
    - fetch settings from `chrome.storage.sync.get(DEFAULT_SETTINGS)`
-   - build route plan (or single route) and open with same tab placement policy
+   - build route plan (or single route) and open in the current tab
 4. Keep one source of truth for storage keys to avoid drift.
 
 Pseudo-flow:
@@ -194,21 +210,27 @@ const oa = await resolveOpenAccessTarget({ url: sourceUrl, title }, settings);
 const target = oa?.url || buildArchiveRoutePlan(sourceUrl, {
   preferredMirror: settings.preferredMirror
 })[0]?.url;
-// open using same tab strategy as this project
+const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+if (activeTab?.id && target) {
+  await chrome.tabs.update(activeTab.id, { url: target });
+}
 ```
 
 ## 9) Regression Checklist
 
-- Toolbar click opens archive route.
-- Toolbar click should open a tab immediately (placeholder), then navigate to final target.
+- Toolbar click resolves OA/archive route and opens it in the current tab.
+- Context-menu archive/search actions open adjacent tabs and still resolve targets.
 - Archive snapshot should auto-convert to reader mode (text-only) when content extraction succeeds.
 - Likely paywalled pages should show prompt banner and `Open Accessible Version` action should trigger resolver.
 - Paywall prompt should not appear when `paywallPromptEnabled` is set to `false`.
+- With LinkPreview installed, paywall prompt should not trigger from inside LinkPreview's preview window chrome.
 - Page context search works.
 - Link archive/search both work.
 - Action menu `Wayback Machine versions` opens the in-page snapshot popup.
 - Action menu `Open settings` opens `options.html`.
-- Options save + reload persists all toggles/radio state.
+- Settings no longer include `Open archive pages in` or `Activate new archive tab from`.
+- Open Access tab contains both resolver behavior controls and provider controls.
+- Options save + reload persists all remaining toggles/fields.
 - `Refresh Extension` button reloads extension runtime.
 - No console errors in service worker.
 

@@ -5,15 +5,16 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 ## Features
 
 - Toolbar action with OA-first resolution and archive fallback.
+- Toolbar click opens resolved target in the current tab.
 - Context menu actions for archiving or searching links/pages.
 - Toolbar icon context action to open an in-page Wayback snapshot popup.
-- Configurable tab placement and tab activation behavior.
 - Resolver pipeline with mirror-aware route planning.
 - Open-access provider chain (Unpaywall, OpenAlex, Europe PMC, Crossref, CORE).
 - Optional preloaded fallback tab for archive actions.
 - Instant tab feedback (`about:blank` placeholder while target resolves).
 - Automatic text-only reader view on archive snapshot pages.
 - In-page paywall prompt that can open an accessible version in one click.
+- Paywall detection ignores LinkPreview preview-window UI so duplicate prompts are avoided when both extensions are installed.
 - Settings UI includes `Refresh Extension` action.
 - Shared `chrome.storage.sync` settings.
 - Reusable archive URL core for integration into other extensions.
@@ -58,16 +59,13 @@ Open extension options from the action menu (`Open settings`) or from `chrome://
 - Tabs:
   - `General`
   - `Open Access`
-- Tab behavior:
-  - New tab adjacent
-  - New tab at end
-  - Active for archive, adjacent for search
-- Activation toggles for each entry point (toolbar/page/link).
-- Resolver behavior:
+- General:
   - preferred archive mirror
   - preload archive search fallback
   - auto-detect paywall prompt (on/off)
+- Open Access resolver behavior:
   - open-access wait budget
+  - enable/disable OA resolver
 - Open-access providers:
   - enable/disable provider toggles
   - Unpaywall email
@@ -92,6 +90,7 @@ Expected behavior:
 - If archive snapshot loads successfully, extension auto-switches to a text-only reader layout.
 - If paywall signals are detected and `Auto-detect paywall prompt` is enabled, banner appears with `Open Accessible Version`.
 - If `Auto-detect paywall prompt` is disabled, no paywall banner is shown.
+- With LinkPreview installed, paywall signals inside LinkPreview preview UI do not trigger this extension's paywall banner.
 
 ## Known Limits
 
@@ -107,7 +106,7 @@ Expected behavior:
   - `src/archive_client.js` for archive URL building/normalization.
   - `src/access_resolver.js` for route planning across mirrors.
   - `src/open_access_resolver.js` for OA target discovery and provider scoring.
-  - `src/settings_model.js` for tab option enums and storage defaults.
+  - `src/settings_model.js` for shared storage defaults.
 - Options page script (`options.js`) is an ES module and consumes shared settings.
 
 ## File Structure
@@ -141,7 +140,13 @@ MIT License. See `LICENSE`.
 
 ## Version History
 
-### v0.11.0 (Current)
+### v0.12.0 (Current)
+- Simplified settings model by removing tab-placement and activation options.
+- Toolbar click now resolves OA/archive target and opens it in the current tab.
+- Moved resolver behavior and OA provider controls into the Open Access section.
+- Kept existing dark paywall prompt and Wayback popup styling unchanged.
+
+### v0.11.0
 - Added OA provider resolver chain with configurable timeout budget.
 - Added provider settings (Unpaywall/OpenAlex/Europe PMC/Crossref/CORE).
 - Added optional DOI extraction from active page metadata via scripting API.
