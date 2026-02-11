@@ -6,11 +6,13 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 
 - Toolbar action with OA-first resolution and archive fallback.
 - Context menu actions for archiving or searching links/pages.
+- Toolbar icon context action to open a Wayback snapshot picker anchored to the extension icon.
 - Configurable tab placement and tab activation behavior.
 - Resolver pipeline with mirror-aware route planning.
 - Open-access provider chain (Unpaywall, OpenAlex, Europe PMC, Crossref, CORE).
 - Optional preloaded fallback tab for archive actions.
 - Instant tab feedback (`about:blank` placeholder while target resolves).
+- Automatic text-only reader view on archive snapshot pages.
 - Settings UI includes `Refresh Extension` action.
 - Shared `chrome.storage.sync` settings.
 - Reusable archive URL core for integration into other extensions.
@@ -32,6 +34,8 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 - Right-click link:
   - `Archive -> Archive link`
   - `Archive -> Search link`
+- Right-click extension icon:
+  - `Wayback Machine versions` (opens icon-anchored version picker + calendar shortcut)
 
 ## OA Setup
 
@@ -46,7 +50,7 @@ To enable best open-access results:
 
 ## Settings
 
-Open extension options from `chrome://extensions/` to configure:
+Open extension options from the action menu (`Open settings`) or from `chrome://extensions/` to configure:
 
 - Tab behavior:
   - New tab adjacent
@@ -78,6 +82,7 @@ Expected behavior:
 - If OA target resolves within budget, it opens OA target.
 - If OA does not resolve in time, archive route opens.
 - If archive has no snapshot, archive search page may show no results.
+- If archive snapshot loads successfully, extension auto-switches to a text-only reader layout.
 
 ## Known Limits
 
@@ -103,6 +108,8 @@ paywallRemover/
 ├── service_worker.js
 ├── options.html
 ├── options.js
+├── wayback_picker.html
+├── wayback_picker.js
 ├── src/
 │   ├── archive_client.js
 │   ├── access_resolver.js
@@ -117,7 +124,7 @@ paywallRemover/
 - No build step required.
 - Use Chrome or any Chromium browser supporting MV3.
 - Keep `LICENSE` intact for redistribution.
-- Required permissions include `activeTab`, `scripting`, and provider `host_permissions` (see `manifest.json`).
+- Required permissions include `activeTab`, `scripting`, and provider/archive `host_permissions` (see `manifest.json`).
 
 ## License
 

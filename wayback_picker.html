@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wayback Versions</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4f5f7;
+            --panel: #ffffff;
+            --ink: #111827;
+            --muted: #6b7280;
+            --stroke: #d7dde6;
+            --primary: #0a66c2;
+            --primary-ink: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+        }
+
+        body {
+            width: min(100vw, 480px);
+            max-width: 480px;
+            min-width: 320px;
+            padding: clamp(8px, 2vw, 12px);
+            margin: 0 auto;
+            overflow: auto;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--stroke);
+            border-radius: 14px;
+            padding: clamp(12px, 2.4vw, 16px);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.08);
+            max-height: calc(100vh - clamp(16px, 4vw, 24px));
+            overflow: auto;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.2;
+        }
+
+        .subtitle {
+            margin-top: 8px;
+            font-size: 12px;
+            color: var(--muted);
+            overflow-wrap: anywhere;
+        }
+
+        .row {
+            margin-top: 14px;
+        }
+
+        label {
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        select {
+            width: 100%;
+            min-height: 42px;
+            border-radius: 10px;
+            border: 1px solid var(--stroke);
+            background: #fff;
+            padding: 10px;
+            font-size: 13px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1 1 150px;
+        }
+
+        .primary {
+            background: var(--primary);
+            color: var(--primary-ink);
+        }
+
+        .secondary {
+            background: #eef2f7;
+            color: #1f2937;
+        }
+
+        .status {
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
+            min-height: 18px;
+        }
+
+        @media (max-width: 440px) {
+            body {
+                width: 100%;
+                max-width: none;
+                min-width: 0;
+                padding: 8px;
+            }
+
+            .actions {
+                gap: 8px;
+            }
+
+            button {
+                flex-basis: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <h1>Wayback Machine Versions</h1>
+        <p id="targetUrl" class="subtitle"></p>
+
+        <div class="row">
+            <label for="snapshotSelect">Available snapshots</label>
+            <select id="snapshotSelect" disabled>
+                <option>Loading snapshots...</option>
+            </select>
+        </div>
+
+        <div class="actions">
+            <button id="openSnapshot" class="primary" disabled>Open selected snapshot</button>
+            <button id="openCalendar" class="secondary">Open calendar view</button>
+            <button id="refreshList" class="secondary">Refresh list</button>
+        </div>
+
+        <p id="status" class="status" aria-live="polite"></p>
+    </main>
+
+    <script type="module" src="wayback_picker.js"></script>
+</body>
+</html>

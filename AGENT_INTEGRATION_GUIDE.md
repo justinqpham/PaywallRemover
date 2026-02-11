@@ -12,6 +12,8 @@ This document is the technical handoff for integrating this extension's archive 
   - `service_worker.js`
   - `options.html`
   - `options.js`
+  - `wayback_picker.html`
+  - `wayback_picker.js`
 - Shared core modules:
   - `src/archive_client.js`
   - `src/access_resolver.js`
@@ -23,6 +25,9 @@ This document is the technical handoff for integrating this extension's archive 
 - UI events trigger from:
   - Toolbar click (`chrome.action.onClicked`)
   - Context menus (`chrome.contextMenus.onClicked`)
+- Action context menu includes a Wayback snapshot picker entry (`contexts: ['action']`).
+- Wayback picker attempts `chrome.action.openPopup()` first (icon-anchored) and falls back to a positioned popup window.
+- Action context menu includes `Open settings`, which opens `options.html` in a new tab.
 - Event handlers load persisted settings from `chrome.storage.sync`.
 - URL targets are converted into archive URLs through shared core modules.
 - Navigation is executed through `chrome.tabs.create` or `chrome.tabs.update`.
@@ -99,6 +104,7 @@ Important: other agents should read defaults from `DEFAULT_SETTINGS` rather than
 - Uses activation flags based on action source.
 - Uses resolver plan for archive actions and optional preloaded fallback.
 - Uses OA resolver with short wait budget before archive fallback.
+- Applies automatic reader-mode transform on archive snapshot tabs (text-only render).
 
 Menu IDs currently:
 
@@ -106,6 +112,8 @@ Menu IDs currently:
 - `link_archive_root`
 - `link_archive_open`
 - `link_archive_search`
+- `action_wayback_versions`
+- `action_open_settings`
 
 If another extension depends on menu IDs, keep these constants stable.
 
@@ -137,8 +145,12 @@ Minimum required permissions for this feature set:
 Background must remain module-enabled:
 
 - `"background": { "service_worker": "service_worker.js", "type": "module" }`
-- `options_ui.open_in_tab` is currently `true` (settings open as a normal tab).
+- This project currently has no `options_ui` manifest entry; settings are opened directly via `chrome.runtime.getURL('options.html')`.
 - `host_permissions` for provider APIs:
+  - `https://web.archive.org/*`
+  - `https://archive.is/*`
+  - `https://archive.ph/*`
+  - `https://archive.today/*`
   - `https://api.unpaywall.org/*`
   - `https://api.openalex.org/*`
   - `https://api.crossref.org/*`
@@ -177,8 +189,11 @@ const target = oa?.url || buildArchiveRoutePlan(sourceUrl, {
 
 - Toolbar click opens archive route.
 - Toolbar click should open a tab immediately (placeholder), then navigate to final target.
+- Archive snapshot should auto-convert to reader mode (text-only) when content extraction succeeds.
 - Page context search works.
 - Link archive/search both work.
+- Action menu `Wayback Machine versions` opens picker (popup or fallback window).
+- Action menu `Open settings` opens `options.html`.
 - Options save + reload persists all toggles/radio state.
 - `Refresh Extension` button reloads extension runtime.
 - No console errors in service worker.

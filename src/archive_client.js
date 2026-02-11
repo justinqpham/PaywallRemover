@@ -1,4 +1,5 @@
 const DEFAULT_MIRROR_BASE = 'https://archive.is';
+const DEFAULT_WAYBACK_BASE = 'https://web.archive.org';
 
 function trimTrailingSlashes(value) {
     return String(value || '').replace(/\/+$/, '');
@@ -25,6 +26,11 @@ export function buildSearchUrl(uri, mirrorBase = DEFAULT_MIRROR_BASE) {
     return `${base}/search/?q=${encodeURIComponent(String(uri || ''))}`;
 }
 
+export function buildWaybackCalendarUrl(uri, waybackBase = DEFAULT_WAYBACK_BASE) {
+    const base = trimTrailingSlashes(waybackBase) || DEFAULT_WAYBACK_BASE;
+    return `${base}/web/*/${normalizeArchiveUri(uri)}`;
+}
+
 export function createArchiveClient(options = {}) {
     const mirrorBase = trimTrailingSlashes(options.mirrorBase) || DEFAULT_MIRROR_BASE;
 
@@ -32,7 +38,7 @@ export function createArchiveClient(options = {}) {
         mirrorBase,
         normalizeArchiveUri,
         buildNewestSnapshotUrl: (uri) => buildNewestSnapshotUrl(uri, mirrorBase),
-        buildSearchUrl: (uri) => buildSearchUrl(uri, mirrorBase)
+        buildSearchUrl: (uri) => buildSearchUrl(uri, mirrorBase),
+        buildWaybackCalendarUrl
     });
 }
-
