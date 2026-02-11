@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paywall Remover Settings</title>
+    <style>
+        :root {
+            --bg-top: #f7f8fb;
+            --bg-bottom: #e8edf6;
+            --glass: rgba(255, 255, 255, 0.74);
+            --glass-border: rgba(255, 255, 255, 0.68);
+            --text-main: #1d1d1f;
+            --text-muted: #6e6e73;
+            --accent: #0071e3;
+            --accent-strong: #005dc0;
+            --success: #007f5f;
+            --card-shadow: 0 28px 55px rgba(15, 23, 42, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+            --hairline: rgba(15, 23, 42, 0.08);
+            --page-pad-y: clamp(20px, 3.2dvh, 34px);
+            --page-pad-x: clamp(18px, 3vw, 30px);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            height: 100%;
+            overscroll-behavior: none;
+        }
+
+        body {
+            margin: 0;
+            height: 100%;
+            min-height: 100dvh;
+            padding: var(--page-pad-y) var(--page-pad-x);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow: hidden;
+            overscroll-behavior: none;
+            font-family: "SF Pro Text", "SF Pro Display", "Avenir Next", "Helvetica Neue", "Helvetica", sans-serif;
+            color: var(--text-main);
+            background:
+                radial-gradient(180px 180px at 8% 10%, rgba(0, 113, 227, 0.24), transparent 78%),
+                radial-gradient(260px 260px at 100% 0%, rgba(14, 165, 233, 0.22), transparent 75%),
+                linear-gradient(150deg, var(--bg-top), var(--bg-bottom));
+        }
+
+        .panel {
+            width: 100%;
+            max-width: 920px;
+            border-radius: 28px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass);
+            backdrop-filter: blur(18px) saturate(150%);
+            box-shadow: var(--card-shadow);
+            padding: clamp(14px, 2dvh + 8px, 26px) clamp(14px, 2.1vw, 24px);
+            max-height: calc(100dvh - (var(--page-pad-y) * 2));
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            scrollbar-gutter: stable;
+            animation: reveal 420ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .header {
+            margin-bottom: 22px;
+        }
+
+        .title {
+            margin: 0;
+            font-size: 1.55rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            margin: 8px 0 0;
+            color: var(--text-muted);
+            font-size: 0.98rem;
+        }
+
+        .section {
+            border: 1px solid var(--hairline);
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.66);
+            padding: 18px;
+            margin: 0;
+        }
+
+        .settings-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .section h2 {
+            margin: 0 0 14px;
+            font-size: 0.98rem;
+            font-weight: 620;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
+        }
+
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .radio-option {
+            display: grid;
+            grid-template-columns: 22px 1fr;
+            gap: 12px;
+            align-items: flex-start;
+            cursor: pointer;
+            border-radius: 14px;
+            padding: 10px 11px;
+            transition: background-color 180ms ease, transform 180ms ease;
+        }
+
+        .radio-option:hover {
+            background: rgba(0, 113, 227, 0.07);
+            transform: translateY(-1px);
+        }
+
+        .radio-option input[type="radio"] {
+            margin: 2px 0 0;
+            width: 18px;
+            height: 18px;
+            accent-color: var(--accent);
+        }
+
+        .option-title {
+            display: block;
+            font-size: 0.95rem;
+            font-weight: 560;
+            color: var(--text-main);
+        }
+
+        .option-hint {
+            display: block;
+            margin-top: 2px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.35;
+        }
+
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            border-radius: 14px;
+            padding: 9px 10px;
+            transition: background-color 180ms ease;
+        }
+
+        .switch-row:hover {
+            background: rgba(0, 113, 227, 0.07);
+        }
+
+        .switch-row .label {
+            font-size: 0.94rem;
+            font-weight: 540;
+            color: var(--text-main);
+        }
+
+        .field-row {
+            display: grid;
+            gap: 6px;
+            border-radius: 14px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid var(--hairline);
+        }
+
+        .field-label {
+            font-size: 0.9rem;
+            font-weight: 560;
+            color: var(--text-main);
+        }
+
+        .field-help {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        .field-select {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.16);
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-main);
+            font-size: 0.9rem;
+            padding: 8px 10px;
+            outline: none;
+        }
+
+        .field-input {
+            width: 100%;
+            border-radius: 10px;
+            border: 1px solid rgba(15, 23, 42, 0.16);
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--text-main);
+            font-size: 0.9rem;
+            padding: 8px 10px;
+            outline: none;
+        }
+
+        .field-input:focus-visible,
+        .field-select:focus-visible {
+            border-color: rgba(0, 113, 227, 0.55);
+            box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.18);
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 46px;
+            height: 28px;
+            flex: 0 0 auto;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            border-radius: 30px;
+            background: rgba(120, 120, 128, 0.28);
+            transition: background-color 170ms ease;
+        }
+
+        .slider::before {
+            content: "";
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            left: 2px;
+            top: 2px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+            transition: transform 170ms ease;
+        }
+
+        .switch input:checked + .slider {
+            background: var(--accent);
+        }
+
+        .switch input:checked + .slider::before {
+            transform: translateX(18px);
+        }
+
+        .switch input:focus-visible + .slider,
+        .radio-option input[type="radio"]:focus-visible {
+            outline: 2px solid rgba(0, 113, 227, 0.4);
+            outline-offset: 2px;
+        }
+
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .footer-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        #bSave {
+            border: 0;
+            border-radius: 999px;
+            padding: 13px 24px;
+            font-size: 0.95rem;
+            font-weight: 640;
+            letter-spacing: 0.01em;
+            color: #fff;
+            background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+            box-shadow: 0 8px 22px rgba(0, 113, 227, 0.34);
+            cursor: pointer;
+            transition: transform 170ms ease, box-shadow 170ms ease, filter 170ms ease;
+        }
+
+        #bSave:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px rgba(0, 113, 227, 0.36);
+            filter: brightness(1.02);
+        }
+
+        #bSave:active {
+            transform: translateY(0);
+        }
+
+        #bReloadExtension {
+            border: 1px solid rgba(15, 23, 42, 0.18);
+            border-radius: 999px;
+            padding: 13px 20px;
+            font-size: 0.92rem;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            color: var(--text-main);
+            background: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: transform 170ms ease, background-color 170ms ease, border-color 170ms ease;
+        }
+
+        #bReloadExtension:hover {
+            transform: translateY(-1px);
+            background: #fff;
+            border-color: rgba(15, 23, 42, 0.28);
+        }
+
+        #bReloadExtension:active {
+            transform: translateY(0);
+        }
+
+        #status {
+            min-height: 1.2em;
+            font-size: 0.9rem;
+            font-weight: 580;
+            color: var(--success);
+        }
+
+        .note {
+            margin-top: 16px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            padding: 12px 14px;
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid var(--hairline);
+        }
+
+        @keyframes reveal {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.988);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @media (max-width: 640px) {
+            :root {
+                --page-pad-y: 14px;
+                --page-pad-x: 12px;
+            }
+
+            body {
+                align-items: flex-start;
+            }
+
+            .panel {
+                padding: 12px 10px;
+                border-radius: 22px;
+            }
+
+            .section {
+                padding: 12px 10px;
+            }
+
+            .footer {
+                margin-top: 10px;
+                gap: 8px;
+            }
+        }
+
+        @media (min-width: 760px) {
+            .settings-grid {
+                grid-template-columns: 1fr 1fr;
+                align-items: start;
+            }
+        }
+
+        @media (max-height: 760px) {
+            :root {
+                --page-pad-y: 10px;
+                --page-pad-x: 12px;
+            }
+
+            .header {
+                margin-bottom: 12px;
+            }
+
+            .subtitle {
+                margin-top: 4px;
+                font-size: 0.9rem;
+            }
+
+            .section {
+                padding: 12px;
+            }
+
+            .section h2 {
+                margin-bottom: 10px;
+                font-size: 0.92rem;
+            }
+
+            .stack {
+                gap: 6px;
+            }
+
+            .radio-option,
+            .switch-row {
+                padding: 6px 8px;
+            }
+
+            .field-row {
+                padding: 8px;
+            }
+
+            .option-hint {
+                display: none;
+            }
+
+            .footer {
+                margin-top: 10px;
+                gap: 8px;
+            }
+
+            .note {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="panel">
+        <header class="header">
+            <h1 class="title">Paywall Remover</h1>
+            <p class="subtitle">Control how archive pages open and which actions grab focus.</p>
+        </header>
+
+        <div class="settings-grid">
+            <section class="section">
+                <h2>Open archive pages in</h2>
+                <div class="stack">
+                    <label class="radio-option" for="tabAdj">
+                        <input type="radio" id="tabAdj" name="tabCtl">
+                        <span>
+                            <span class="option-title">New tab adjacent</span>
+                            <span class="option-hint">Opens beside your current tab.</span>
+                        </span>
+                    </label>
+                    <label class="radio-option" for="tabEnd">
+                        <input type="radio" id="tabEnd" name="tabCtl">
+                        <span>
+                            <span class="option-title">New tab at end</span>
+                            <span class="option-hint">Places archive tabs at the far right.</span>
+                        </span>
+                    </label>
+                    <label class="radio-option" for="tabAct">
+                        <input type="radio" id="tabAct" name="tabCtl">
+                        <span>
+                            <span class="option-title">Active for archive, adjacent for search</span>
+                            <span class="option-hint">Archive replaces the current tab, search still opens adjacent.</span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Activate new archive tab from</h2>
+                <div class="stack">
+                    <label class="switch-row">
+                        <span class="label">Toolbar button</span>
+                        <span class="switch">
+                            <input id="cbButtonNew" tabindex="1" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label class="switch-row">
+                        <span class="label">Page search</span>
+                        <span class="switch">
+                            <input id="cbPageNew" tabindex="2" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label class="switch-row">
+                        <span class="label">Archive link</span>
+                        <span class="switch">
+                            <input id="cbArchiveNew" tabindex="3" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                    <label class="switch-row">
+                        <span class="label">Search link</span>
+                        <span class="switch">
+                            <input id="cbSearchNew" tabindex="4" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Resolver Behavior</h2>
+                <div class="stack">
+                    <div class="field-row">
+                        <label class="field-label" for="selPreferredMirror">Preferred mirror</label>
+                        <select id="selPreferredMirror" class="field-select">
+                            <option value="https://archive.is">archive.is</option>
+                            <option value="https://archive.ph">archive.ph</option>
+                            <option value="https://archive.today">archive.today</option>
+                        </select>
+                        <div class="field-help">Primary mirror used for archive and search routes.</div>
+                    </div>
+                    <label class="switch-row">
+                        <span class="label">Preload search fallback</span>
+                        <span class="switch">
+                            <input id="cbPreloadFallback" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="section">
+                <h2>Open-Access Providers</h2>
+                <div class="stack">
+                    <label class="switch-row">
+                        <span class="label">Enable OA resolver before archive</span>
+                        <span class="switch">
+                            <input id="cbOpenAccessEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <div class="field-row">
+                        <label class="field-label" for="inOpenAccessWaitMs">Resolver wait budget (ms)</label>
+                        <input id="inOpenAccessWaitMs" class="field-input" type="number" min="0" max="3000" step="100">
+                        <div class="field-help">How long to wait for OA results before archive fallback. Suggested: 700-1200.</div>
+                    </div>
+
+                    <label class="switch-row">
+                        <span class="label">Unpaywall</span>
+                        <span class="switch">
+                            <input id="cbUnpaywallEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <label class="switch-row">
+                        <span class="label">OpenAlex</span>
+                        <span class="switch">
+                            <input id="cbOpenAlexEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <label class="switch-row">
+                        <span class="label">Europe PMC</span>
+                        <span class="switch">
+                            <input id="cbEuropePmcEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <label class="switch-row">
+                        <span class="label">Crossref</span>
+                        <span class="switch">
+                            <input id="cbCrossrefEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <label class="switch-row">
+                        <span class="label">CORE</span>
+                        <span class="switch">
+                            <input id="cbCoreEnabled" type="checkbox">
+                            <span class="slider"></span>
+                        </span>
+                    </label>
+
+                    <div class="field-row">
+                        <label class="field-label" for="inUnpaywallEmail">Unpaywall email</label>
+                        <input id="inUnpaywallEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
+                        <div class="field-help">Required for Unpaywall API requests.</div>
+                    </div>
+
+                    <div class="field-row">
+                        <label class="field-label" for="inContactEmail">Contact email (optional)</label>
+                        <input id="inContactEmail" class="field-input" type="email" placeholder="support@yourdomain.com">
+                        <div class="field-help">Used as polite contact where providers support it.</div>
+                    </div>
+
+                    <div class="field-row">
+                        <label class="field-label" for="inCoreApiKey">CORE API key (optional)</label>
+                        <input id="inCoreApiKey" class="field-input" type="password" autocomplete="off" placeholder="Paste CORE API key">
+                        <div class="field-help">Stored locally in browser sync settings.</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="footer">
+            <div class="footer-actions">
+                <button id="bSave" type="button">Save Changes</button>
+                <button id="bReloadExtension" type="button">Refresh Extension</button>
+            </div>
+            <div id="status" aria-live="polite"></div>
+        </div>
+
+        <p class="note">
+            CloudFlare DNS may not resolve archive mirrors reliably. If you hit DNS errors, switch DNS provider and try another archive mirror.
+        </p>
+    </main>
+    <script type="module" src="options.js"></script>
+</body>
+</html>
