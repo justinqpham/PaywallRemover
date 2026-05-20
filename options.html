@@ -503,7 +503,7 @@
     <main class="panel">
         <header class="header">
             <h1 class="title">Paywall Remover</h1>
-            <p class="subtitle">Control how archive pages open and which actions grab focus.</p>
+            <p class="subtitle">Configure mirror behavior, paywall prompts, and open-access resolution.</p>
         </header>
 
         <div class="tab-strip" role="tablist" aria-label="Settings tabs">
@@ -532,70 +532,9 @@
         </div>
 
         <section id="panelGeneral" class="tab-panel is-active" role="tabpanel" aria-labelledby="tabButtonGeneral" data-tab-panel="general">
-            <div class="settings-grid settings-grid--general">
+            <div class="settings-grid">
                 <section class="section">
-                    <h2>Open archive pages in</h2>
-                    <div class="stack">
-                        <label class="radio-option" for="tabAdj">
-                            <input type="radio" id="tabAdj" name="tabCtl">
-                            <span>
-                                <span class="option-title">New tab adjacent</span>
-                                <span class="option-hint">Opens beside your current tab.</span>
-                            </span>
-                        </label>
-                        <label class="radio-option" for="tabEnd">
-                            <input type="radio" id="tabEnd" name="tabCtl">
-                            <span>
-                                <span class="option-title">New tab at end</span>
-                                <span class="option-hint">Places archive tabs at the far right.</span>
-                            </span>
-                        </label>
-                        <label class="radio-option" for="tabAct">
-                            <input type="radio" id="tabAct" name="tabCtl">
-                            <span>
-                                <span class="option-title">Active for archive, adjacent for search</span>
-                                <span class="option-hint">Archive replaces the current tab, search still opens adjacent.</span>
-                            </span>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="section">
-                    <h2>Activate new archive tab from</h2>
-                    <div class="stack">
-                        <label class="switch-row">
-                            <span class="label">Toolbar button</span>
-                            <span class="switch">
-                                <input id="cbButtonNew" tabindex="1" type="checkbox">
-                                <span class="slider"></span>
-                            </span>
-                        </label>
-                        <label class="switch-row">
-                            <span class="label">Page search</span>
-                            <span class="switch">
-                                <input id="cbPageNew" tabindex="2" type="checkbox">
-                                <span class="slider"></span>
-                            </span>
-                        </label>
-                        <label class="switch-row">
-                            <span class="label">Archive link</span>
-                            <span class="switch">
-                                <input id="cbArchiveNew" tabindex="3" type="checkbox">
-                                <span class="slider"></span>
-                            </span>
-                        </label>
-                        <label class="switch-row">
-                            <span class="label">Search link</span>
-                            <span class="switch">
-                                <input id="cbSearchNew" tabindex="4" type="checkbox">
-                                <span class="slider"></span>
-                            </span>
-                        </label>
-                    </div>
-                </section>
-
-                <section class="section">
-                    <h2>Resolver Behavior</h2>
+                    <h2>General</h2>
                     <div class="stack">
                         <div class="field-row">
                             <label class="field-label" for="selPreferredMirror">Preferred mirror</label>
@@ -628,7 +567,7 @@
         <section id="panelOpenAccess" class="tab-panel" role="tabpanel" aria-labelledby="tabButtonOpenAccess" data-tab-panel="open_access" hidden>
             <div class="settings-grid">
                 <section class="section">
-                    <h2>Open-Access Providers</h2>
+                    <h2>Open Access & Resolver Behavior</h2>
                     <div class="stack">
                         <label class="switch-row">
                             <span class="label">Enable OA resolver before archive</span>

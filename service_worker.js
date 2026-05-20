@@ -1,7 +1,7 @@
-import { buildArchiveRoutePlan, buildPrimarySearchRoute } from './src/access_resolver.js';
+import { buildArchiveRoutePlan, buildPrimarySearchRoute, DEFAULT_ARCHIVE_MIRRORS } from './src/access_resolver.js';
 import { resolveOpenAccessTarget } from './src/open_access_resolver.js';
-import { DEFAULT_SETTINGS, TAB_OPTION } from './src/settings_model.js';
-import { buildWaybackCalendarUrl } from './src/archive_client.js';
+import { DEFAULT_SETTINGS } from './src/settings_model.js';
+import { buildWaybackCalendarUrl, buildNewestSnapshotUrl, buildSearchUrl } from './src/archive_client.js';
 
 const MENU_ID = Object.freeze({
     PAGE_SEARCH: 'page_search_archive',
@@ -22,6 +22,89 @@ const ARCHIVE_READER_HOSTS = Object.freeze(new Set([
     'archive.ph',
     'archive.today'
 ]));
+const WAYBACK_MAX_RESULTS = 80;
+const WAYBACK_FULL_CACHE_TTL_MS = 5 * 60 * 1000;
+const WAYBACK_PARTIAL_CACHE_TTL_MS = 90 * 1000;
+const WAYBACK_FAST_TIMEOUT_MS = 1400;
+const WAYBACK_FULL_TIMEOUT_MS = 4200;
+const waybackCache = new Map();
+const waybackInFlight = new Map();
+
+// --- Mirror health rotation ---
+const MIRROR_PROBE_TIMEOUT_MS = 2500;
+const MIRROR_HEALTH_TTL_MS = 5 * 60 * 1000;
+const NGINX_DETECT_PATTERN = /welcome to nginx|<title>\s*nginx\s*<\/title>/i;
+const mirrorHealthCache = new Map();
+const archiveTabRetries = new Map();
+const MAX_MIRROR_RETRIES = 2;
+
+async function probeMirrorHealth(mirrorBase) {
+    try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), MIRROR_PROBE_TIMEOUT_MS);
+        const response = await fetch(mirrorBase, {
+            signal: controller.signal,
+            cache: 'no-store'
+        });
+        clearTimeout(timer);
+        if (!response.ok) {
+            return false;
+        }
+        const text = (await response.text()).slice(0, 4000);
+        return !NGINX_DETECT_PATTERN.test(text);
+    } catch (error) {
+        return false;
+    }
+}
+
+async function isMirrorHealthy(mirrorBase) {
+    const cached = mirrorHealthCache.get(mirrorBase);
+    if (cached && (Date.now() - cached.checkedAt) < MIRROR_HEALTH_TTL_MS) {
+        return cached.healthy;
+    }
+    const healthy = await probeMirrorHealth(mirrorBase);
+    mirrorHealthCache.set(mirrorBase, { healthy, checkedAt: Date.now() });
+    return healthy;
+}
+
+async function resolveHealthyMirror(preferredMirror) {
+    if (await isMirrorHealthy(preferredMirror)) {
+        return preferredMirror;
+    }
+    for (const mirror of DEFAULT_ARCHIVE_MIRRORS) {
+        if (mirror === preferredMirror) {
+            continue;
+        }
+        if (await isMirrorHealthy(mirror)) {
+            return mirror;
+        }
+    }
+    return preferredMirror;
+}
+
+function parseArchiveUrl(url) {
+    try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        if (!ARCHIVE_READER_HOSTS.has(host)) {
+            return null;
+        }
+        const mirrorBase = `${parsed.protocol}//${parsed.host}`;
+        const newestMatch = parsed.pathname.match(/^\/newest\/(.+)$/);
+        if (newestMatch) {
+            return { mirrorBase, originalUrl: newestMatch[1], kind: 'newest' };
+        }
+        if (parsed.pathname.startsWith('/search/')) {
+            const q = parsed.searchParams.get('q');
+            if (q) {
+                return { mirrorBase, originalUrl: q, kind: 'search' };
+            }
+        }
+        return null;
+    } catch (error) {
+        return null;
+    }
+}
 
 function isSupportedUrl(url) {
     return typeof url === 'string' && /^https?:\/\//i.test(url);
@@ -135,7 +218,7 @@ async function resolveOpenAccessQuickly(context, settings) {
     return Promise.race([resolverPromise, timeoutPromise]);
 }
 
-async function createPlaceholderTab(shouldActivate, placeAtEnd) {
+async function createPlaceholderTab(shouldActivate) {
     const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const createOptions = { url: 'about:blank', active: shouldActivate };
 
@@ -143,9 +226,7 @@ async function createPlaceholderTab(shouldActivate, placeAtEnd) {
         createOptions.openerTabId = activeTab.id;
     }
 
-    if (placeAtEnd) {
-        createOptions.index = 999;
-    } else if (typeof activeTab?.index === 'number') {
+    if (typeof activeTab?.index === 'number') {
         createOptions.index = activeTab.index + 1;
     }
 
@@ -237,7 +318,7 @@ function normalizeWaybackSnapshots(payload, originalUrl) {
             url
         });
 
-        if (snapshots.length >= 140) {
+        if (snapshots.length >= WAYBACK_MAX_RESULTS) {
             break;
         }
     }
@@ -245,40 +326,256 @@ function normalizeWaybackSnapshots(payload, originalUrl) {
     return snapshots;
 }
 
-async function fetchWaybackSnapshots(originalUrl) {
+function normalizeWaybackRequestUrl(url) {
+    try {
+        const parsed = new URL(String(url || ''));
+        parsed.hash = '';
+        return parsed.toString();
+    } catch (error) {
+        return String(url || '');
+    }
+}
+
+function getWaybackCacheKey(url) {
+    return normalizeWaybackRequestUrl(url);
+}
+
+function setWaybackCache(originalUrl, snapshots, calendarUrl, complete) {
+    const key = getWaybackCacheKey(originalUrl);
+    waybackCache.set(key, {
+        snapshots: Array.isArray(snapshots) ? snapshots : [],
+        calendarUrl: String(calendarUrl || ''),
+        complete: Boolean(complete),
+        fetchedAt: Date.now()
+    });
+}
+
+function getFreshWaybackCache(originalUrl, requireComplete = false) {
+    const key = getWaybackCacheKey(originalUrl);
+    const entry = waybackCache.get(key);
+    if (!entry) {
+        return null;
+    }
+
+    const ttl = entry.complete ? WAYBACK_FULL_CACHE_TTL_MS : WAYBACK_PARTIAL_CACHE_TTL_MS;
+    if ((Date.now() - entry.fetchedAt) > ttl) {
+        waybackCache.delete(key);
+        return null;
+    }
+
+    if (requireComplete && !entry.complete) {
+        return null;
+    }
+
+    return entry;
+}
+
+function getAnyWaybackCache(originalUrl) {
+    const key = getWaybackCacheKey(originalUrl);
+    return waybackCache.get(key) || null;
+}
+
+function mergeWaybackSnapshots(...groups) {
+    const merged = [];
+    const seen = new Set();
+
+    for (const group of groups) {
+        if (!Array.isArray(group)) {
+            continue;
+        }
+
+        for (const snapshot of group) {
+            const timestamp = String(snapshot?.timestamp || '');
+            if (!/^\d{14}$/.test(timestamp) || seen.has(timestamp)) {
+                continue;
+            }
+
+            seen.add(timestamp);
+            merged.push(snapshot);
+        }
+    }
+
+    merged.sort((a, b) => String(b.timestamp || '').localeCompare(String(a.timestamp || '')));
+    return merged.slice(0, WAYBACK_MAX_RESULTS);
+}
+
+async function fetchJsonWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const response = await fetch(url, {
+            cache: 'no-store',
+            signal: controller.signal
+        });
+
+        if (!response.ok) {
+            throw new Error(`Wayback request failed (${response.status})`);
+        }
+
+        return await response.json();
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function buildWaybackCdxEndpoint(originalUrl, options = {}) {
     const endpoint = new URL('https://web.archive.org/cdx/search/cdx');
     endpoint.searchParams.set('url', originalUrl);
     endpoint.searchParams.set('output', 'json');
     endpoint.searchParams.set('fl', 'timestamp,original,statuscode');
     endpoint.searchParams.set('filter', 'statuscode:200');
-    endpoint.searchParams.set('collapse', 'timestamp:10');
-    endpoint.searchParams.set('limit', '200');
     endpoint.searchParams.set('sort', 'reverse');
+    endpoint.searchParams.set('limit', String(options.limit || WAYBACK_MAX_RESULTS));
 
-    const response = await fetch(endpoint.toString(), { cache: 'no-store' });
-    if (!response.ok) {
-        throw new Error(`Wayback request failed (${response.status})`);
+    if (options.collapse) {
+        endpoint.searchParams.set('collapse', options.collapse);
     }
 
-    const payload = await response.json();
+    return endpoint;
+}
+
+async function fetchWaybackLatestSnapshot(originalUrl) {
+    const endpoint = buildWaybackCdxEndpoint(originalUrl, { limit: 1 });
+    const payload = await fetchJsonWithTimeout(endpoint.toString(), WAYBACK_FAST_TIMEOUT_MS);
     const snapshots = normalizeWaybackSnapshots(payload, originalUrl);
+    return snapshots.slice(0, 1);
+}
+
+async function fetchWaybackDetailedSnapshots(originalUrl) {
+    const endpoint = buildWaybackCdxEndpoint(originalUrl, {
+        limit: WAYBACK_MAX_RESULTS,
+        collapse: 'timestamp:10'
+    });
+    const payload = await fetchJsonWithTimeout(endpoint.toString(), WAYBACK_FULL_TIMEOUT_MS);
+    return normalizeWaybackSnapshots(payload, originalUrl);
+}
+
+async function fetchWaybackSnapshotsFull(originalUrl) {
+    const calendarUrl = buildWaybackCalendarUrl(originalUrl);
+    const [latestResult, detailedResult] = await Promise.allSettled([
+        fetchWaybackLatestSnapshot(originalUrl),
+        fetchWaybackDetailedSnapshots(originalUrl)
+    ]);
+
+    const latestSnapshots = latestResult.status === 'fulfilled' ? latestResult.value : [];
+    const detailedSnapshots = detailedResult.status === 'fulfilled' ? detailedResult.value : [];
+    const snapshots = mergeWaybackSnapshots(latestSnapshots, detailedSnapshots);
+    const complete = detailedResult.status === 'fulfilled';
+
+    if (!complete && latestResult.status !== 'fulfilled') {
+        throw new Error('Wayback fetch failed');
+    }
+
+    setWaybackCache(originalUrl, snapshots, calendarUrl, complete);
+
     return {
         snapshots,
-        calendarUrl: buildWaybackCalendarUrl(originalUrl)
+        calendarUrl,
+        complete
     };
 }
 
+function ensureWaybackFullRefresh(originalUrl) {
+    const key = getWaybackCacheKey(originalUrl);
+    const existing = waybackInFlight.get(key);
+    if (existing) {
+        return existing;
+    }
+
+    const task = fetchWaybackSnapshotsFull(originalUrl).finally(() => {
+        waybackInFlight.delete(key);
+    });
+    waybackInFlight.set(key, task);
+    return task;
+}
+
 async function handleFetchWaybackSnapshots(message) {
-    const sourceUrl = String(message?.url || '');
+    const sourceUrl = normalizeWaybackRequestUrl(String(message?.url || ''));
+    const mode = message?.mode === 'full' ? 'full' : 'quick';
     if (!isSupportedUrl(sourceUrl)) {
         return { ok: false, error: 'unsupported_url', snapshots: [] };
     }
 
+    const calendarUrl = buildWaybackCalendarUrl(sourceUrl);
+
+    if (mode === 'quick') {
+        const cached = getFreshWaybackCache(sourceUrl, false);
+        if (cached) {
+            if (!cached.complete) {
+                ensureWaybackFullRefresh(sourceUrl).catch(() => {});
+            }
+            return {
+                ok: true,
+                snapshots: cached.snapshots,
+                calendarUrl: cached.calendarUrl || calendarUrl,
+                partial: !cached.complete,
+                cached: true
+            };
+        }
+
+        try {
+            const latestSnapshots = await fetchWaybackLatestSnapshot(sourceUrl);
+            setWaybackCache(sourceUrl, latestSnapshots, calendarUrl, false);
+            ensureWaybackFullRefresh(sourceUrl).catch(() => {});
+            return {
+                ok: true,
+                snapshots: latestSnapshots,
+                calendarUrl,
+                partial: true,
+                cached: false
+            };
+        } catch (error) {
+            ensureWaybackFullRefresh(sourceUrl).catch(() => {});
+            const stale = getAnyWaybackCache(sourceUrl);
+            if (stale) {
+                return {
+                    ok: true,
+                    snapshots: stale.snapshots,
+                    calendarUrl: stale.calendarUrl || calendarUrl,
+                    partial: !stale.complete,
+                    cached: true,
+                    stale: true
+                };
+            }
+            return { ok: false, error: 'wayback_fetch_failed', snapshots: [], calendarUrl };
+        }
+    }
+
+    const completeCache = getFreshWaybackCache(sourceUrl, true);
+    if (completeCache) {
+        return {
+            ok: true,
+            snapshots: completeCache.snapshots,
+            calendarUrl: completeCache.calendarUrl || calendarUrl,
+            partial: false,
+            cached: true
+        };
+    }
+
     try {
-        const result = await fetchWaybackSnapshots(sourceUrl);
-        return { ok: true, ...result };
+        const result = await ensureWaybackFullRefresh(sourceUrl);
+        return {
+            ok: true,
+            snapshots: result.snapshots,
+            calendarUrl: result.calendarUrl,
+            partial: !result.complete,
+            cached: false
+        };
     } catch (error) {
-        return { ok: false, error: 'wayback_fetch_failed', snapshots: [], calendarUrl: buildWaybackCalendarUrl(sourceUrl) };
+        const fallback = getFreshWaybackCache(sourceUrl, false) || getAnyWaybackCache(sourceUrl);
+        if (fallback) {
+            return {
+                ok: true,
+                snapshots: fallback.snapshots,
+                calendarUrl: fallback.calendarUrl || calendarUrl,
+                partial: !fallback.complete,
+                cached: true,
+                stale: true
+            };
+        }
+
+        return { ok: false, error: 'wayback_fetch_failed', snapshots: [], calendarUrl };
     }
 }
 
@@ -289,7 +586,7 @@ async function handleOpenFromPaywallPrompt(message, sender) {
     }
 
     const settings = await getSettings();
-    await openArchivePage(sourceUrl, settings.activateButtonNew, settings.tabOption, settings, {
+    await openArchivePage(sourceUrl, settings, {
         source: 'page',
         title: String(message?.title || ''),
         tabId: sender?.tab?.id
@@ -326,8 +623,8 @@ function onRuntimeMessage(message, sender, sendResponse) {
     }
 }
 
-async function createTabNearCurrent(url, shouldActivate, placeAtEnd) {
-    const createdTab = await createPlaceholderTab(shouldActivate, placeAtEnd);
+async function createTabNearCurrent(url, shouldActivate = true) {
+    const createdTab = await createPlaceholderTab(shouldActivate);
     if (typeof createdTab?.id === 'number') {
         await chrome.tabs.update(createdTab.id, { url });
         return createdTab;
@@ -598,42 +895,50 @@ function scheduleArchiveReaderMode(tabId) {
     });
 }
 
-async function openArchivePage(url, shouldActivate, tabOption, settings, context = {}) {
+async function openArchivePage(url, settings, context = {}, options = {}) {
     if (!isSupportedUrl(url)) {
         return;
     }
 
+    const pageDoi = context.source === 'page' ? await extractDoiFromActiveTab(context.tabId) : null;
+
+    const [healthyMirror, openAccessTarget] = await Promise.all([
+        resolveHealthyMirror(settings.preferredMirror),
+        resolveOpenAccessQuickly({
+            url,
+            title: context.title || '',
+            doi: pageDoi
+        }, settings)
+    ]);
+
     const routes = buildArchiveRoutePlan(url, {
-        preferredMirror: settings.preferredMirror
+        preferredMirror: healthyMirror
     });
     const primaryRoute = routes[0];
     if (!primaryRoute) {
         return;
     }
 
-    const pageDoi = context.source === 'page' ? await extractDoiFromActiveTab(context.tabId) : null;
-    const openAccessTarget = await resolveOpenAccessQuickly({
-        url,
-        title: context.title || '',
-        doi: pageDoi
-    }, settings);
-
     const finalUrl = openAccessTarget?.url || primaryRoute.url;
 
     let archiveTabId = null;
+    const openInCurrentTab = options?.openInCurrentTab === true;
+    const shouldActivate = options?.shouldActivate !== false;
 
-    if (tabOption === TAB_OPTION.ACTIVE_ARCHIVE) {
-        const updatedTab = await chrome.tabs.update({ url: finalUrl });
-        archiveTabId = typeof updatedTab?.id === 'number' ? updatedTab.id : context.tabId;
-    } else {
-        const slotTab = await createPlaceholderTab(shouldActivate, tabOption === TAB_OPTION.END);
-        if (typeof slotTab?.id === 'number') {
-            await chrome.tabs.update(slotTab.id, { url: finalUrl });
-            archiveTabId = slotTab.id;
+    if (openInCurrentTab) {
+        const activeTab = typeof context.tabId === 'number'
+            ? { id: context.tabId }
+            : await getActiveTab();
+        if (typeof activeTab?.id === 'number') {
+            const updatedTab = await chrome.tabs.update(activeTab.id, { url: finalUrl, active: true });
+            archiveTabId = updatedTab?.id;
         } else {
-            const fallbackTab = await createTabNearCurrent(finalUrl, shouldActivate, tabOption === TAB_OPTION.END);
+            const fallbackTab = await chrome.tabs.create({ url: finalUrl, active: true });
             archiveTabId = fallbackTab?.id;
         }
+    } else {
+        const targetTab = await createTabNearCurrent(finalUrl, shouldActivate);
+        archiveTabId = targetTab?.id;
     }
 
     if (!openAccessTarget && typeof archiveTabId === 'number') {
@@ -641,23 +946,24 @@ async function openArchivePage(url, shouldActivate, tabOption, settings, context
     }
 
     if (!openAccessTarget && settings.preloadSearchFallback && routes.length > 1) {
-        await createTabNearCurrent(routes[1].url, false, tabOption === TAB_OPTION.END);
+        await createTabNearCurrent(routes[1].url, false);
     }
 }
 
-async function openSearchPage(url, shouldActivate, tabOption, settings) {
+async function openSearchPage(url, settings, options = {}) {
     if (!isSupportedUrl(url)) {
         return;
     }
 
+    const healthyMirror = await resolveHealthyMirror(settings.preferredMirror);
     const route = buildPrimarySearchRoute(url, {
-        preferredMirror: settings.preferredMirror
+        preferredMirror: healthyMirror
     });
     if (!route) {
         return;
     }
 
-    await createTabNearCurrent(route.url, shouldActivate, tabOption === TAB_OPTION.END);
+    await createTabNearCurrent(route.url, options?.shouldActivate !== false);
 }
 
 function createContextMenus() {
@@ -704,10 +1010,12 @@ function createContextMenus() {
 chrome.action.onClicked.addListener((tab) => {
     runSafely(async () => {
         const settings = await getSettings();
-        await openArchivePage(tab?.url, settings.activateButtonNew, settings.tabOption, settings, {
+        await openArchivePage(tab?.url, settings, {
             source: 'page',
             title: tab?.title || '',
             tabId: tab?.id
+        }, {
+            openInCurrentTab: true
         });
     });
 });
@@ -729,9 +1037,8 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
                 const opened = await showWaybackOverlayOnTab(sourceTab, sourceUrl);
                 if (!opened) {
-                    const settings = await getSettings();
                     const calendarUrl = buildWaybackCalendarUrl(sourceUrl);
-                    await createTabNearCurrent(calendarUrl, settings.activateButtonNew, settings.tabOption === TAB_OPTION.END);
+                    await createTabNearCurrent(calendarUrl, true);
                 }
                 return;
             }
@@ -749,22 +1056,90 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
         switch (info.menuItemId) {
             case MENU_ID.LINK_ARCHIVE:
-                await openArchivePage(info.linkUrl, settings.activateArchiveNew, settings.tabOption, settings, {
+                await openArchivePage(info.linkUrl, settings, {
                     source: 'link',
                     title: tab?.title || '',
                     tabId: tab?.id
                 });
                 break;
             case MENU_ID.LINK_SEARCH:
-                await openSearchPage(info.linkUrl, settings.activateSearchNew, settings.tabOption, settings);
+                await openSearchPage(info.linkUrl, settings);
                 break;
             case MENU_ID.PAGE_SEARCH:
-                await openSearchPage(tab?.url, settings.activatePageNew, settings.tabOption, settings);
+                await openSearchPage(tab?.url, settings);
                 break;
             default:
                 break;
         }
     });
+});
+
+// --- Reactive nginx detection and mirror auto-rotation ---
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status !== 'complete') {
+        return;
+    }
+
+    const archiveInfo = parseArchiveUrl(tab?.url);
+    if (!archiveInfo) {
+        return;
+    }
+
+    runSafely(async () => {
+        const retries = archiveTabRetries.get(tabId) || 0;
+        if (retries >= MAX_MIRROR_RETRIES) {
+            archiveTabRetries.delete(tabId);
+            return;
+        }
+
+        let isNginx = false;
+        try {
+            const [{ result }] = await chrome.scripting.executeScript({
+                target: { tabId },
+                func: () => {
+                    const html = document.documentElement.innerHTML.slice(0, 4000);
+                    return /welcome to nginx|<title>\s*nginx\s*<\/title>/i.test(html);
+                }
+            });
+            isNginx = Boolean(result);
+        } catch (error) {
+            return;
+        }
+
+        if (!isNginx) {
+            archiveTabRetries.delete(tabId);
+            return;
+        }
+
+        mirrorHealthCache.set(archiveInfo.mirrorBase, { healthy: false, checkedAt: Date.now() });
+
+        let nextMirror = null;
+        for (const mirror of DEFAULT_ARCHIVE_MIRRORS) {
+            if (mirror === archiveInfo.mirrorBase) {
+                continue;
+            }
+            if (await isMirrorHealthy(mirror)) {
+                nextMirror = mirror;
+                break;
+            }
+        }
+
+        if (!nextMirror) {
+            archiveTabRetries.delete(tabId);
+            return;
+        }
+
+        const newUrl = archiveInfo.kind === 'newest'
+            ? buildNewestSnapshotUrl(archiveInfo.originalUrl, nextMirror)
+            : buildSearchUrl(archiveInfo.originalUrl, nextMirror);
+
+        archiveTabRetries.set(tabId, retries + 1);
+        await chrome.tabs.update(tabId, { url: newUrl });
+    });
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+    archiveTabRetries.delete(tabId);
 });
 
 chrome.runtime.onMessage.addListener(onRuntimeMessage);

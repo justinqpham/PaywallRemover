@@ -1,4 +1,4 @@
-const DEFAULT_MIRROR_BASE = 'https://archive.is';
+const DEFAULT_MIRROR_BASE = 'https://archive.ph';
 const DEFAULT_WAYBACK_BASE = 'https://web.archive.org';
 
 function trimTrailingSlashes(value) {

@@ -1,8 +1,8 @@
 import { buildNewestSnapshotUrl, buildSearchUrl } from './archive_client.js';
 
 export const DEFAULT_ARCHIVE_MIRRORS = Object.freeze([
-    'https://archive.is',
     'https://archive.ph',
+    'https://archive.is',
     'https://archive.today'
 ]);
 

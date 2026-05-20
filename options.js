@@ -1,4 +1,12 @@
-import { DEFAULT_SETTINGS, MIRROR_BASE, TAB_OPTION } from './src/settings_model.js';
+import { DEFAULT_SETTINGS, MIRROR_BASE } from './src/settings_model.js';
+
+const LEGACY_SETTING_KEYS = Object.freeze([
+    'tabOption',
+    'activateButtonNew',
+    'activatePageNew',
+    'activateArchiveNew',
+    'activateSearchNew'
+]);
 
 function setActiveSettingsTab(tabName) {
     const buttons = document.querySelectorAll('[data-tab-button]');
@@ -34,16 +42,7 @@ function initializeSettingsTabs() {
 }
 
 function readSettingsFromForm() {
-    const tabOption = document.getElementById('tabEnd').checked
-        ? TAB_OPTION.END
-        : (document.getElementById('tabAct').checked ? TAB_OPTION.ACTIVE_ARCHIVE : TAB_OPTION.ADJACENT);
-
     return {
-        tabOption,
-        activateButtonNew: document.getElementById('cbButtonNew').checked,
-        activatePageNew: document.getElementById('cbPageNew').checked,
-        activateArchiveNew: document.getElementById('cbArchiveNew').checked,
-        activateSearchNew: document.getElementById('cbSearchNew').checked,
         preferredMirror: document.getElementById('selPreferredMirror').value,
         preloadSearchFallback: document.getElementById('cbPreloadFallback').checked,
         paywallPromptEnabled: document.getElementById('cbPaywallPromptEnabled').checked,
@@ -61,23 +60,6 @@ function readSettingsFromForm() {
 }
 
 function applySettingsToForm(settings) {
-    switch (settings.tabOption) {
-        case TAB_OPTION.END:
-            document.getElementById('tabEnd').checked = true;
-            break;
-        case TAB_OPTION.ACTIVE_ARCHIVE:
-            document.getElementById('tabAct').checked = true;
-            break;
-        default:
-            document.getElementById('tabAdj').checked = true;
-            break;
-    }
-
-    document.getElementById('cbButtonNew').checked = settings.activateButtonNew;
-    document.getElementById('cbPageNew').checked = settings.activatePageNew;
-    document.getElementById('cbArchiveNew').checked = settings.activateArchiveNew;
-    document.getElementById('cbSearchNew').checked = settings.activateSearchNew;
-
     const preferredMirrorInput = document.getElementById('selPreferredMirror');
     preferredMirrorInput.value = settings.preferredMirror || MIRROR_BASE.ARCHIVE_IS;
     if (!preferredMirrorInput.value) {
@@ -110,6 +92,7 @@ function showSavedState() {
 
 async function saveOptions() {
     await chrome.storage.sync.set(readSettingsFromForm());
+    await chrome.storage.sync.remove(LEGACY_SETTING_KEYS);
     showSavedState();
 }
 

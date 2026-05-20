@@ -18,6 +18,8 @@ A Chrome extension that opens the current page (or a link) in archive mirrors wi
 - Settings UI includes `Refresh Extension` action.
 - Shared `chrome.storage.sync` settings.
 - Reusable archive URL core for integration into other extensions.
+- Automatic mirror health probing with 5-minute cache — unhealthy mirrors are skipped before navigation.
+- Reactive nginx detection: if a mirror serves a default nginx page after load, the tab is automatically redirected to the next healthy mirror (up to 2 retries per tab).
 
 ## Installation
 
@@ -91,6 +93,7 @@ Expected behavior:
 - If paywall signals are detected and `Auto-detect paywall prompt` is enabled, banner appears with `Open Accessible Version`.
 - If `Auto-detect paywall prompt` is disabled, no paywall banner is shown.
 - With LinkPreview installed, paywall signals inside LinkPreview preview UI do not trigger this extension's paywall banner.
+- If the preferred mirror returns a default nginx page, the tab auto-redirects to the next healthy mirror without user action.
 
 ## Known Limits
 
@@ -140,13 +143,24 @@ MIT License. See `LICENSE`.
 
 ## Version History
 
-### v0.12.0 (Current)
+### v0.13.0 (Current)
+
+- Default mirror changed from `archive.is` to `archive.ph`.
+- Added proactive mirror health probe: before navigating, the preferred mirror is fetched and checked for nginx default page indicators; result cached for 5 minutes.
+- Health check runs in parallel with open-access resolution so it adds no extra latency on cached runs.
+- Added reactive nginx detection: a `tabs.onUpdated` listener checks archive tabs after load and auto-redirects to the next healthy mirror if nginx is detected (up to 2 retries per tab).
+- Exported `DEFAULT_ARCHIVE_MIRRORS` from `access_resolver.js` for use in health rotation.
+- Added `buildNewestSnapshotUrl` and `buildSearchUrl` imports to service worker for mirror URL rebuilding.
+
+### v0.12.0
+
 - Simplified settings model by removing tab-placement and activation options.
 - Toolbar click now resolves OA/archive target and opens it in the current tab.
 - Moved resolver behavior and OA provider controls into the Open Access section.
 - Kept existing dark paywall prompt and Wayback popup styling unchanged.
 
 ### v0.11.0
+
 - Added OA provider resolver chain with configurable timeout budget.
 - Added provider settings (Unpaywall/OpenAlex/Europe PMC/Crossref/CORE).
 - Added optional DOI extraction from active page metadata via scripting API.
@@ -159,17 +173,20 @@ MIT License. See `LICENSE`.
 - Added settings toggle for paywall prompt auto-detection.
 
 ### v0.10.0
+
 - Added archive resolver planning with mirror ordering.
 - Added preferred mirror setting.
 - Added optional "preload search fallback" behavior.
 - Added integration handoff doc (`AGENT_INTEGRATION_GUIDE.md`).
 
 ### v0.9.0
+
 - Refactored archive logic into reusable modules.
 - Converted service worker and options script to ES modules.
 - Removed debug logging and simplified event flow.
 - Updated architecture and documentation.
 
 ### v0.8.0
+
 - Toolbar/archive actions open `archive.is/newest/...`.
 - Canonical URL normalization for archive lookups.

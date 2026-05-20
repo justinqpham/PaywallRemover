@@ -1,9 +1,3 @@
-export const TAB_OPTION = Object.freeze({
-    ADJACENT: 0,
-    END: 1,
-    ACTIVE_ARCHIVE: 2
-});
-
 export const MIRROR_BASE = Object.freeze({
     ARCHIVE_IS: 'https://archive.is',
     ARCHIVE_PH: 'https://archive.ph',
@@ -11,12 +5,7 @@ export const MIRROR_BASE = Object.freeze({
 });
 
 export const DEFAULT_SETTINGS = Object.freeze({
-    tabOption: TAB_OPTION.ADJACENT,
-    activateButtonNew: true,
-    activatePageNew: true,
-    activateArchiveNew: true,
-    activateSearchNew: true,
-    preferredMirror: MIRROR_BASE.ARCHIVE_IS,
+    preferredMirror: MIRROR_BASE.ARCHIVE_PH,
     preloadSearchFallback: false,
     paywallPromptEnabled: true,
     openAccessEnabled: true,
